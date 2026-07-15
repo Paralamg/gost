@@ -23,7 +23,7 @@ class ElementFactory:
 
     def create_image(self, path: str, alt: str) -> Image:
         index = self.__index_manager.get_image_index()
-        return Image(index, alt, path)
+        return Image(index, path, alt)
 
     def create_table(
             self,

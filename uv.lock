@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "gost-builder"
+name = "gost-docx"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
