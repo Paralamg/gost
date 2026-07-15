@@ -22,11 +22,5 @@ class Head(NumberedElement):
 
     def __prepare_render_text(self) -> str:
         if self.use_number:
-            text = f"{self.index} {self.text}"
-        else:
-            text = f"{self.text}"
-
-        if self.level == 1:
-            text = text.upper()
-
-        return text
+            return f"{self.index} {self.text}"
+        return f"{self.text}"

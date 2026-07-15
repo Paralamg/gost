@@ -15,7 +15,7 @@ ASSETS = Path(__file__).parent
 
 def main() -> None:
     wb = WordBuilder()
-    factory = ElementFactory(IndexManager(index_type=IndexType.CONTINUOUS))
+    factory = ElementFactory(IndexManager(character="А", index_type=IndexType.CONTINUOUS))
 
     # --- Заголовки ---
     wb.add_element(factory.create_head(True, "Заголовок первого уровня (Heading 1, по центру, UPPER)", 1))
@@ -28,20 +28,24 @@ def main() -> None:
         "Обычный абзац: Times New Roman 14pt, выравнивание по ширине, "
         "межстрочный интервал 1,5, красная строка 1,25 см. "
         "Длинный текст нужен, чтобы проверить выравнивание по ширине на нескольких строках — "
-        "вот ещё немного слов для этого."
+        "вот ещё немного слов для этого. "
     ))
+    wb.add_element(factory.create_text(""))
     wb.add_element(factory.create_text(
         "Абзац с **жирным текстом** внутри обычного предложения — "
         "проверка парсера **bold**-разметки."
     ))
-    wb.add_element(factory.create_text("Ещё один абзац — проверка отступа красной строки."))
 
-    # --- Рисунок ---
-    wb.add_element(factory.create_image(
+    # Пример ссылки на изображение
+    image = factory.create_image(
         str(ASSETS / "test_image.png"),
         "Пример подписи к рисунку. Пример подписи к рисунку. Пример подписи к рисунку. "
         "Пример подписи к рисунку. Пример подписи к рисунку",
-    ))
+    )
+    wb.add_element(factory.create_text(f"На рисунке {image.index}."))
+
+    # --- Рисунок ---
+    wb.add_element(image)
 
     # --- Таблица по умолчанию: «№ п/п» и строка номеров столбцов ---
     # Числа форматируются до передачи — Table приводит значения через str().

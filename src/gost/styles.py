@@ -35,27 +35,28 @@ def _apply_table_text_style(doc: Document) -> None:
     table_text = doc.styles.add_style("Table Text", WD_STYLE_TYPE.PARAGRAPH)
     table_text.font.name = "Times New Roman"
     table_text.font.size = Pt(12)
-    table_text.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    table_text.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
     table_text.paragraph_format.first_line_indent = Cm(0)
     table_text.paragraph_format.space_before = Pt(0)
     table_text.paragraph_format.space_after = Pt(0)
 
 
 def _apply_heading_styles(doc: Document) -> None:
-    # (style_name, centered, font_size, space_before)
+    # (style_name, centered, all_caps, font_size, space_before)
     heading_configs = [
-        ("Heading 1", True,  Pt(14), Pt(0)),
-        ("Heading 2", False, Pt(14), Pt(0)),
-        ("Heading 3", False, Pt(14), Pt(0)),
-        ("Heading 4", False, Pt(14), Pt(0)),
+        ("Heading 1", True,  True,  Pt(14), Pt(0)),
+        ("Heading 2", False, False, Pt(14), Pt(0)),
+        ("Heading 3", False, False, Pt(14), Pt(0)),
+        ("Heading 4", False, False, Pt(14), Pt(0)),
     ]
-    for style_name, centered, font_size, space_before in heading_configs:
+    for style_name, centered, all_caps, font_size, space_before in heading_configs:
         s = doc.styles[style_name]
         s.font.name = "Times New Roman"
         _remove_theme_font_overrides(s)
         s.font.size = font_size
         s.font.bold = True
         s.font.italic = False
+        s.font.all_caps = all_caps
         s.font.color.rgb = RGBColor(0, 0, 0)
         s.paragraph_format.alignment = (
             WD_ALIGN_PARAGRAPH.CENTER if centered else WD_ALIGN_PARAGRAPH.LEFT
