@@ -42,28 +42,26 @@ def _apply_table_text_style(doc: Document) -> None:
 
 
 def _apply_heading_styles(doc: Document) -> None:
-    # (style_name, centered, all_caps, font_size, space_before)
+    # (style_name, bold)
     heading_configs = [
-        ("Heading 1", True,  True,  Pt(14), Pt(0)),
-        ("Heading 2", False, False, Pt(14), Pt(0)),
-        ("Heading 3", False, False, Pt(14), Pt(0)),
-        ("Heading 4", False, False, Pt(14), Pt(0)),
+        ("Heading 1", True),
+        ("Heading 2", True),
+        ("Heading 3", False),
+        ("Heading 4", False),
     ]
-    for style_name, centered, all_caps, font_size, space_before in heading_configs:
+    for style_name, bold in heading_configs:
         s = doc.styles[style_name]
         s.font.name = "Times New Roman"
         _remove_theme_font_overrides(s)
-        s.font.size = font_size
-        s.font.bold = True
+        s.font.size = Pt(14)
+        s.font.bold = bold
         s.font.italic = False
-        s.font.all_caps = all_caps
+        s.font.all_caps = False
         s.font.color.rgb = RGBColor(0, 0, 0)
-        s.paragraph_format.alignment = (
-            WD_ALIGN_PARAGRAPH.CENTER if centered else WD_ALIGN_PARAGRAPH.LEFT
-        )
+        s.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         s.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-        s.paragraph_format.first_line_indent = Cm(0) if centered else Cm(1.25)
-        s.paragraph_format.space_before = space_before
+        s.paragraph_format.first_line_indent = Cm(1.25)
+        s.paragraph_format.space_before = Pt(0)
         s.paragraph_format.space_after = Pt(0)
         _remove_bottom_border(s)
 
