@@ -27,7 +27,7 @@ class ElementFactory:
     def create_table(
             self,
             data: Mapping[str, Sequence[Any]],
-            title: str | None = None,
+            title: str,
             *,
             show_header: bool = True,
             show_row_numbers: bool = True,

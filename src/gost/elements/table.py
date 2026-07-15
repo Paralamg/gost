@@ -19,7 +19,7 @@ class Table(NumberedElement):
             self,
             index: str,
             data: Mapping[str, Sequence[Any]],
-            title: str | None = None,
+            title: str,
             *,
             show_header: bool = True,
             show_row_numbers: bool = True,
@@ -28,17 +28,14 @@ class Table(NumberedElement):
     ) -> None:
         """Создает таблицу по ГОСТ 7.32 с подписью «Таблица N – title».
 
-        Номер таблицы выделяется всегда, даже при title=None: подпись в этом
-        случае не выводится, но номер уже занят и появится в «Продолжение
-        таблицы N» при разрыве.
-
         Args:
             data: Данные по столбцам: {«Показатель А»: [1.0, 2.5], ...}.
                 Совместимо с df.to_dict("list"). Индексы строк не учитываются.
                 Значения приводятся к строке через str() — числа форматируйте
                 до передачи, иначе 0.1 + 0.2 попадет в документ как
                 «0.30000000000000004».
-            title: Заголовок таблицы. None — подпись не выводится.
+            title: Заголовок таблицы. Обязателен: ГОСТ 7.32-2017 (6.6.2) требует
+                наименование у каждой таблицы.
             show_header: Выводить строку с именами столбцов.
             show_row_numbers: Добавлять слева столбец «№ п/п» с нумерацией строк.
             show_column_numbers: Добавлять строку с номерами столбцов 1..N.
@@ -51,10 +48,12 @@ class Table(NumberedElement):
                 странице, но без подписи «Продолжение».
 
         Raises:
-            ValueError: Если столбцов нет, они разной длины или split_after
-                выходит за пределы тела таблицы.
+            ValueError: Если заголовок пуст, столбцов нет, они разной длины или
+                split_after выходит за пределы тела таблицы.
         """
         super().__init__(index)
+        if not title or not title.strip():
+            raise ValueError("Таблице нужен заголовок")
         self.grid = build_grid(
             data,
             show_header=show_header,
@@ -71,8 +70,9 @@ class Table(NumberedElement):
     def render(self, document: Document) -> None:
         first, *rest = _split(self.grid.body, self.split_after)
 
-        if self.title is not None:
-            write_caption(document, CAPTION.format(index=self.index, title=self.title))
+        # Подпись есть у каждой таблицы, поэтому она же отделяет её от предыдущей:
+        # два w:tbl подряд Word слил бы в одну таблицу.
+        write_caption(document, CAPTION.format(index=self.index, title=self.title))
 
         # Повтор шапки силами Word — только когда мы не разбиваем таблицу сами,
         # иначе шапка задвоится на странице продолжения.
@@ -85,8 +85,6 @@ class Table(NumberedElement):
                 page_break_before=True,
             )
             write_part(document, self.grid, self.grid.head_rows + part)
-
-        document.add_paragraph()
 
 
 def _validate_splits(split_after: Sequence[int] | None, row_count: int) -> list[int]:
