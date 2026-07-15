@@ -24,11 +24,15 @@ class Image(NumberedElement):
     def render(self, document: Document) -> None:
         if self.path.exists():
             document.add_picture(str(self.path), width=Cm(16.5))
-            last_paragraph = document.paragraphs[-1]
-            last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            last_paragraph.paragraph_format.first_line_indent = Cm(0)
+            picture = document.paragraphs[-1]
+            picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            picture.paragraph_format.first_line_indent = Cm(0)
         else:
-            document.add_paragraph(f"[Изображение не найдено: {self.path}]")
+            picture = document.add_paragraph(f"[Изображение не найдено: {self.path}]")
+
+        # Подпись рисунка идёт под ним, поэтому «не отрывать от следующего»
+        # ставится на сам рисунок — иначе он останется внизу страницы один.
+        picture.paragraph_format.keep_with_next = True
 
         caption = document.add_paragraph()
         caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
