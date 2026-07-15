@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 from docx.document import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -11,7 +11,8 @@ from gost.elements.table_writer import write_caption, write_part
 CAPTION = "Таблица {index} – {title}"
 CONTINUATION = "Продолжение табл. {index}"
 
-SplitAfter = Sequence[int] | None
+AUTO = "auto"
+SplitAfter = Sequence[int] | Literal["auto"] | None
 
 
 class Table(NumberedElement):
@@ -45,8 +46,11 @@ class Table(NumberedElement):
             split_after: Номера строк тела (1-based), после которых таблица
                 разрывается: [20] или range(20, row_count, 20). Каждая часть
                 получает подпись «Продолжение табл. N» и строку номеров
-                столбцов. None — таблицу разбивает сам Word, повторяя шапку на
-                каждой странице, но без подписи «Продолжение».
+                столбцов.
+                «auto» — подобрать точки разрыва по месту на странице; требует
+                Word и extra «autosplit», подбор делает WordBuilder.save().
+                None — таблицу разбивает сам Word, повторяя шапку на каждой
+                странице, но без подписи «Продолжение».
 
         Raises:
             ValueError: Если столбцов нет, они разной длины или split_after
@@ -60,7 +64,11 @@ class Table(NumberedElement):
             show_column_numbers=show_column_numbers,
         )
         self.title = title
-        self.split_after = _validate_splits(split_after, len(self.grid.body))
+        self.auto_split = split_after == AUTO
+        self.split_after = (
+            [] if self.auto_split
+            else _validate_splits(split_after, len(self.grid.body))
+        )
 
     def render(self, document: Document) -> None:
         first, *rest = _split(self.grid.body, self.split_after)
@@ -88,7 +96,7 @@ class Table(NumberedElement):
         document.add_paragraph()
 
 
-def _validate_splits(split_after: SplitAfter, row_count: int) -> list[int]:
+def _validate_splits(split_after: Sequence[int] | None, row_count: int) -> list[int]:
     if not split_after:
         return []
 
