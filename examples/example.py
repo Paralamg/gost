@@ -1,10 +1,8 @@
 """
-Генерирует style_preview.docx для визуальной проверки всех стилей WordBuilder.
+Генерирует example.docx для визуальной проверки всех стилей WordBuilder.
 Запуск: python examples/example.py
 """
 from pathlib import Path
-
-import pandas as pd
 
 from gost import WordBuilder
 from gost.element_factory import ElementFactory
@@ -12,7 +10,7 @@ from gost.index.index_manager import IndexManager
 from gost.index.index_type import IndexType
 
 OUTPUT = Path(__file__).parent / "example.docx"
-ASSETS = Path(__file__).parent  # изображений нет, путь нужен только как base_dir
+ASSETS = Path(__file__).parent
 
 
 def main() -> None:
@@ -38,56 +36,41 @@ def main() -> None:
     ))
     wb.add_element(factory.create_text("Ещё один абзац — проверка отступа красной строки."))
 
-    # --- Рисунок (файл не существует → показывает placeholder) ---
+    # --- Рисунок ---
     wb.add_element(factory.create_image(
         str(ASSETS / "test_image.png"),
         "Пример подписи к рисунку. Пример подписи к рисунку. Пример подписи к рисунку. "
         "Пример подписи к рисунку. Пример подписи к рисунку",
     ))
 
-    # --- Таблица с заголовком ---
-    df_full = pd.DataFrame(
+    # --- Таблица по умолчанию: «№ п/п» и строка номеров столбцов ---
+    # Числа форматируются до передачи — Table приводит значения через str().
+    wb.add_element(factory.create_table(
         {
-            "Показатель А": [1.0, 2.5, 3.333],
-            "Показатель Б": [100.0, 200.0, 300.0],
+            "Показатель А": [f"{v:.2f}" for v in (1.0, 2.5, 3.333)],
+            "Показатель Б": [f"{v:.2f}" for v in (100.0, 200.0, 300.0)],
             "Текст": ["alpha", "beta", "gamma"],
         },
-        index=["Строка 1", "Строка 2", "Строка 3"],
-    )
-    wb.add_element(factory.create_table(
-        df_full,
-        float_format=".2f",
-        title="Таблица с заголовком и индексом. Таблица с заголовком и индексом. "
-              "Таблица с заголовком и индексом. Таблица с заголовком и индексом",
+        title="Таблица по умолчанию: со столбцом «№ п/п» и строкой номеров столбцов",
     ))
 
-    # --- Таблица без заголовка ---
-    df_no_title = pd.DataFrame(
-        {"X": [0.1, 0.2], "Y": [0.3, 0.4]},
-        index=["a", "b"],
-    )
-    wb.add_element(factory.create_table(df_no_title, title=None, bold_header=True, bold_index=True))
-
-    # --- Таблица без строки заголовков столбцов ---
-    df_no_header = pd.DataFrame(
-        {"Col1": [10, 20], "Col2": [30, 40]},
-        index=["i", "ii"],
-    )
+    # --- Таблица без автонумерации ---
     wb.add_element(factory.create_table(
-        df_no_header,
-        title="Таблица без строки-заголовка (show_header=False)",
+        {"Имя": ["Алиса", "Боб", "Вера"], "Возраст": [25, 30, 22]},
+        title="Без «№ п/п» и без строки номеров столбцов",
+        show_row_numbers=False,
+        show_column_numbers=False,
+    ))
+
+    # --- Таблица без строки с именами столбцов ---
+    wb.add_element(factory.create_table(
+        {"Col1": [10, 20], "Col2": [30, 40]},
+        title="Без строки-заголовка (show_header=False)",
         show_header=False,
     ))
 
-    # --- Таблица без столбца индекса ---
-    df_no_index = pd.DataFrame(
-        {"Имя": ["Алиса", "Боб", "Вера"], "Возраст": [25, 30, 22]},
-    )
-    wb.add_element(factory.create_table(
-        df_no_index,
-        title="Таблица без индекса (show_index=False)",
-        show_index=False,
-    ))
+    # --- Таблица без подписи ---
+    wb.add_element(factory.create_table({"X": [0.1, 0.2], "Y": [0.3, 0.4]}))
 
     wb.save(OUTPUT)
     print(f"Сохранено: {OUTPUT}")

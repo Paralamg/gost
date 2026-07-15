@@ -1,13 +1,4 @@
 import re
-from typing import Optional
-
-
-def format_value(val, float_format: Optional[str]) -> str:
-    if isinstance(val, float):
-        if float_format:
-            return f"{val:{float_format}}"
-        return str(val)
-    return str(val)
 
 
 def render_bold(paragraph, text: str) -> None:

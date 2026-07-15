@@ -1,6 +1,5 @@
-from typing import Optional
-
-import pandas as pd
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from gost.elements.head import Head
 from gost.elements.image import Image
@@ -27,13 +26,19 @@ class ElementFactory:
 
     def create_table(
             self,
-            df: pd.DataFrame,
-            float_format: Optional[str] = ".1f",
-            title: Optional[str] = None,
+            data: Mapping[str, Sequence[Any]],
+            title: str | None = None,
+            *,
             show_header: bool = True,
-            show_index: bool = True,
-            bold_header: bool = False,
-            bold_index: bool = False,
+            show_row_numbers: bool = True,
+            show_column_numbers: bool = True,
     ) -> Table:
         index = self.__index_manager.get_table_index()
-        return Table(index, df, float_format, title, show_header,show_index, bold_header, bold_index)
+        return Table(
+            index,
+            data,
+            title,
+            show_header=show_header,
+            show_row_numbers=show_row_numbers,
+            show_column_numbers=show_column_numbers,
+        )
