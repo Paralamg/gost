@@ -79,8 +79,9 @@ def write_part(
             paragraph._p.get_or_add_pPr().style = style_id
             paragraph.text = value
 
-    if repeat_head:
-        for row in table.rows[:len(grid.head_rows)]:
+    for row in table.rows[:len(grid.head_rows)]:
+        _keep_with_next(row)
+        if repeat_head:
             _repeat_as_header(row)
 
 
@@ -111,6 +112,17 @@ def _fix_layout(table: DocxTable, widths: list[Length]) -> None:
 def _forbid_split(row: _Row) -> None:
     """«w:cantSplit» — строка не разрывается между страницами."""
     row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+
+
+def _keep_with_next(row: _Row) -> None:
+    """«w:keepNext» — строка не отрывается от следующей.
+
+    Держит строки шапки вместе и не даёт им остаться внизу страницы без единой
+    строки тела.
+    """
+    for cell in row.cells:
+        for paragraph in cell.paragraphs:
+            paragraph.paragraph_format.keep_with_next = True
 
 
 def _repeat_as_header(row: _Row) -> None:
