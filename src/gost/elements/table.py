@@ -75,7 +75,7 @@ class Table(NumberedElement):
             write_caption(document, CAPTION.format(index=self.index, title=self.title))
 
         # Повтор шапки силами Word — только когда мы не разбиваем таблицу сами,
-        # иначе строка номеров задвоится на странице продолжения.
+        # иначе шапка задвоится на странице продолжения.
         write_part(document, self.grid, self.grid.head_rows + first, repeat_head=not rest)
 
         for part in rest:
@@ -84,7 +84,7 @@ class Table(NumberedElement):
                 CONTINUATION.format(index=self.index),
                 page_break_before=True,
             )
-            write_part(document, self.grid, self.grid.repeated_rows + part)
+            write_part(document, self.grid, self.grid.head_rows + part)
 
         document.add_paragraph()
 

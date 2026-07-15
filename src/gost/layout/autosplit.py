@@ -90,6 +90,5 @@ def _place_next_split(
 
 def _part_geometry(table: Table) -> tuple[int, int]:
     """Сколько строк занимает шапка последней части и сколько строк тела до неё."""
-    if table.split_after:
-        return len(table.grid.repeated_rows), table.split_after[-1]
-    return len(table.grid.head_rows), 0
+    offset = table.split_after[-1] if table.split_after else 0
+    return len(table.grid.head_rows), offset

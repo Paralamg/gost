@@ -25,13 +25,13 @@ class Grid:
 
     @property
     def head_rows(self) -> list[list[str]]:
-        """Шапка первой части: имена столбцов и/или их номера."""
-        return [row for row in (self.header, self.numbers) if row is not None]
+        """Шапка таблицы: имена столбцов и/или их номера.
 
-    @property
-    def repeated_rows(self) -> list[list[str]]:
-        """Шапка страницы-продолжения: только номера столбцов (ГОСТ 7.32)."""
-        return [] if self.numbers is None else [self.numbers]
+        Повторяется целиком в каждой части разорванной таблицы. ГОСТ 7.32-2017
+        (6.6.3) разрешает оставлять в продолжении одни номера граф, но не требует
+        этого, а без имён столбцов читать продолжение неудобно.
+        """
+        return [row for row in (self.header, self.numbers) if row is not None]
 
 
 def build_grid(
