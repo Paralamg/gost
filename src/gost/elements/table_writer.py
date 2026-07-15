@@ -1,7 +1,7 @@
 """Вывод сетки таблицы в документ Word."""
 
 from docx.document import Document
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.shared import Cm, Emu, Length, Pt
@@ -72,6 +72,9 @@ def write_part(
         _forbid_split(row)
         for cell, value, width in zip(row.cells, values, widths):
             cell.width = width  # Word ориентируется на ширину ячейки (tcW), а не на gridCol
+            # По горизонтали текст центрует стиль «Table Text»; вертикальное
+            # выравнивание — свойство ячейки, в стиль абзаца его не убрать.
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             paragraph = cell.paragraphs[0]
             paragraph._p.get_or_add_pPr().style = style_id
             paragraph.text = value
