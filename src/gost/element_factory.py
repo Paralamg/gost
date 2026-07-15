@@ -3,6 +3,7 @@ from typing import Any
 
 from gost.elements.head import Head
 from gost.elements.image import Image
+from gost.elements.page_break import BreakType, PageBreak
 from gost.elements.table import SplitAfter, Table
 from gost.elements.text import Text
 from gost.index.index_manager import IndexManager
@@ -19,6 +20,9 @@ class ElementFactory:
     def create_head(self, use_numbers: bool, text: str, level: int) -> Head:
         index = self.__index_manager.get_head_index(level)
         return Head(index, use_numbers, text, level)
+
+    def create_page_break(self, break_type: BreakType = BreakType.NEXT_PAGE) -> PageBreak:
+        return PageBreak(break_type)
 
     def create_image(self, path: str, alt: str) -> Image:
         index = self.__index_manager.get_image_index()

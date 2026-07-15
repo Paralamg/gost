@@ -6,6 +6,7 @@ from pathlib import Path
 
 from gost import WordBuilder
 from gost.element_factory import ElementFactory
+from gost.elements.page_break import BreakType
 from gost.index.index_manager import IndexManager
 from gost.index.index_type import IndexType
 
@@ -86,10 +87,21 @@ def main() -> None:
     # руками не нужно: см. autosplit_example.py, где split_after="auto"
     # находит его измерением.
     wb.add_element(factory.create_table(
-        _cost_data(60),
+        _cost_data(50),
         title="Себестоимость с переносом на следующую страницу",
-        split_after=[20],
+        split_after=[16],
     ))
+
+    # --- Разрыв: по умолчанию «Следующая страница» ---
+    # Разрыв раздела: новый раздел начинается с новой страницы и наследует
+    # поля предыдущего.
+    wb.add_element(factory.create_page_break())
+    wb.add_element(factory.create_text("Этот абзац открывает новый раздел на новой странице."))
+
+    # --- Разрыв: обычная «Страница» ---
+    # Разрыв внутри раздела — новой страницы достаточно, отдельный раздел не нужен.
+    wb.add_element(factory.create_page_break(BreakType.PAGE))
+    wb.add_element(factory.create_text("Этот абзац начинается с новой страницы того же раздела."))
 
     wb.save(OUTPUT)
     print(f"Сохранено: {OUTPUT}")
