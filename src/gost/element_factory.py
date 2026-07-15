@@ -1,24 +1,39 @@
-from gost.index.head_counter import HeadCounter
-from gost.index.counter import Counter
+from typing import Optional
+
+import pandas as pd
+
 from gost.elements.head import Head
 from gost.elements.image import Image
+from gost.elements.table import Table
 from gost.elements.text import Text
+from gost.index.index_manager import IndexManager
 
 
 class ElementFactory:
-    def __init__(self, character: str) -> None:
-        self.__image_counter = Counter()
-        self.__table_counter = Counter()
-        self.__head_counter = HeadCounter()
-        self.__character = character
+    def __init__(self, index_manager: IndexManager = IndexManager()) -> None:
+        assert index_manager is not None
+        self.__index_manager = index_manager
 
     def create_text(self, text: str) -> Text:
         return Text(text)
 
-    def create_head(self, use_numbers: bool, text: str, level: int = 1) -> Head:
-        number = self.__head_counter.get_next(level)
-        return Head(number, use_numbers, text, level)
+    def create_head(self, use_numbers: bool, text: str, level: int) -> Head:
+        index = self.__index_manager.get_head_index(level)
+        return Head(index, use_numbers, text, level)
 
     def create_image(self, path: str, alt: str) -> Image:
-        number = self.__image_counter.get_next()
-        return Image(number, alt, path)
+        index = self.__index_manager.get_image_index()
+        return Image(index, alt, path)
+
+    def create_table(
+            self,
+            df: pd.DataFrame,
+            float_format: Optional[str] = ".1f",
+            title: Optional[str] = None,
+            show_header: bool = True,
+            show_index: bool = True,
+            bold_header: bool = False,
+            bold_index: bool = False,
+    ) -> Table:
+        index = self.__index_manager.get_table_index()
+        return Table(index, df, float_format, title, show_header,show_index, bold_header, bold_index)

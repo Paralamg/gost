@@ -13,7 +13,7 @@ from gost.utils import format_value
 class Table(NumberedElement):
     def __init__(
             self,
-            number: str,
+            index: str,
             df: pd.DataFrame,
             float_format: Optional[str] = ".1f",
             title: Optional[str] = None,
@@ -38,7 +38,7 @@ class Table(NumberedElement):
         Returns:
             Текущий экземпляр WordBuilder для цепочки вызовов.
         """
-        super().__init__(number)
+        super().__init__(index)
         self.df = df
         self.float_format = float_format
         self.title = title
@@ -54,7 +54,7 @@ class Table(NumberedElement):
             caption.paragraph_format.first_line_indent = Cm(0)
             caption.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
             caption.paragraph_format.space_after = Pt(6)
-            run = caption.add_run(f"Таблица – {self.number}  {self.title}")
+            run = caption.add_run(f"Таблица – {self.index}  {self.title}")
             run.font.size = Pt(14)
 
         header_rows = 1 if self.show_header else 0

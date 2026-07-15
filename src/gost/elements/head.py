@@ -6,12 +6,12 @@ from gost.elements.element import NumberedElement
 class Head(NumberedElement):
     def __init__(
             self,
-            number: str,
+            index: str,
             use_number: bool,
             text: str,
             level: int = 1,
     ) -> None:
-        super().__init__(number)
+        super().__init__(index)
         self.text = text
         self.level = level
         self.use_number = use_number

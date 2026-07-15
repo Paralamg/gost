@@ -10,14 +10,14 @@ from gost.elements.element import NumberedElement
 class Image(NumberedElement):
     def __init__(
             self,
-            number: str,
+            index: str,
             path: str,
             alt: str,
     ) -> None:
         """
         Создает изображение с подписью «Рисунок number — alt».
         """
-        super().__init__(number)
+        super().__init__(index)
         self.alt = alt
         self.path = Path(path)
 
@@ -35,5 +35,5 @@ class Image(NumberedElement):
         caption.paragraph_format.first_line_indent = Cm(0)
         caption.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
         caption.paragraph_format.space_after = Pt(6)
-        run = caption.add_run(f"Рисунок {self.number} – {self.alt}")
+        run = caption.add_run(f"Рисунок {self.index} – {self.alt}")
         run.font.size = Pt(14)
