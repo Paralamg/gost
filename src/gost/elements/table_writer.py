@@ -19,12 +19,15 @@ def write_caption(
         document: Document,
         text: str,
         *,
-        align: WD_ALIGN_PARAGRAPH,
         page_break_before: bool = False,
 ) -> None:
-    """Пишет подпись таблицы отдельным абзацем."""
+    """Пишет подпись таблицы отдельным абзацем.
+
+    Подпись первой части и подписи продолжений оформляются одинаково: ГОСТ 7.32-2017
+    (6.6.3) требует писать слева и «Таблица N – ...», и «Продолжение таблицы N».
+    """
     paragraph = document.add_paragraph()
-    paragraph.alignment = align
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     fmt = paragraph.paragraph_format
     fmt.first_line_indent = Cm(0)

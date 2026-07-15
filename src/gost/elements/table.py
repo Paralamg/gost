@@ -2,14 +2,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
 from docx.document import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from gost.elements.element import NumberedElement
 from gost.elements.table_grid import build_grid
 from gost.elements.table_writer import write_caption, write_part
 
 CAPTION = "Таблица {index} – {title}"
-CONTINUATION = "Продолжение табл. {index}"
+CONTINUATION = "Продолжение таблицы {index}"
 
 AUTO = "auto"
 SplitAfter = Sequence[int] | Literal["auto"] | None
@@ -31,7 +30,7 @@ class Table(NumberedElement):
 
         Номер таблицы выделяется всегда, даже при title=None: подпись в этом
         случае не выводится, но номер уже занят и появится в «Продолжение
-        табл. N» при разрыве.
+        таблицы N» при разрыве.
 
         Args:
             data: Данные по столбцам: {«Показатель А»: [1.0, 2.5], ...}.
@@ -45,8 +44,7 @@ class Table(NumberedElement):
             show_column_numbers: Добавлять строку с номерами столбцов 1..N.
             split_after: Номера строк тела (1-based), после которых таблица
                 разрывается: [20] или range(20, row_count, 20). Каждая часть
-                получает подпись «Продолжение табл. N» и строку номеров
-                столбцов.
+                получает подпись «Продолжение таблицы N» и повтор шапки.
                 «auto» — подобрать точки разрыва по месту на странице; требует
                 Word и extra «autosplit», подбор делает WordBuilder.save().
                 None — таблицу разбивает сам Word, повторяя шапку на каждой
@@ -74,11 +72,7 @@ class Table(NumberedElement):
         first, *rest = _split(self.grid.body, self.split_after)
 
         if self.title is not None:
-            write_caption(
-                document,
-                CAPTION.format(index=self.index, title=self.title),
-                align=WD_ALIGN_PARAGRAPH.LEFT,
-            )
+            write_caption(document, CAPTION.format(index=self.index, title=self.title))
 
         # Повтор шапки силами Word — только когда мы не разбиваем таблицу сами,
         # иначе строка номеров задвоится на странице продолжения.
@@ -88,7 +82,6 @@ class Table(NumberedElement):
             write_caption(
                 document,
                 CONTINUATION.format(index=self.index),
-                align=WD_ALIGN_PARAGRAPH.RIGHT,
                 page_break_before=True,
             )
             write_part(document, self.grid, self.grid.repeated_rows + part)
