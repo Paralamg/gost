@@ -42,25 +42,30 @@ def _apply_table_text_style(doc: Document) -> None:
 
 
 def _apply_heading_styles(doc: Document) -> None:
-    # (style_name, bold)
+    # Heading 1 — ненумерованный структурный элемент («Введение», «Основная
+    # часть»), Heading 2..5 — нумерованные разделы и подразделы.
+    # (style_name, bold, centered, all_caps)
     heading_configs = [
-        ("Heading 1", True),
-        ("Heading 2", True),
-        ("Heading 3", False),
-        ("Heading 4", False),
+        ("Heading 1", True,  True,  True),
+        ("Heading 2", True,  False, False),
+        ("Heading 3", True,  False, False),
+        ("Heading 4", False, False, False),
+        ("Heading 5", False, False, False),
     ]
-    for style_name, bold in heading_configs:
+    for style_name, bold, centered, all_caps in heading_configs:
         s = doc.styles[style_name]
         s.font.name = "Times New Roman"
         _remove_theme_font_overrides(s)
         s.font.size = Pt(14)
         s.font.bold = bold
         s.font.italic = False
-        s.font.all_caps = False
+        s.font.all_caps = all_caps
         s.font.color.rgb = RGBColor(0, 0, 0)
-        s.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        s.paragraph_format.alignment = (
+            WD_ALIGN_PARAGRAPH.CENTER if centered else WD_ALIGN_PARAGRAPH.JUSTIFY
+        )
         s.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-        s.paragraph_format.first_line_indent = Cm(1.25)
+        s.paragraph_format.first_line_indent = Cm(0) if centered else Cm(1.25)
         s.paragraph_format.space_before = Pt(0)
         s.paragraph_format.space_after = Pt(0)
         _remove_bottom_border(s)

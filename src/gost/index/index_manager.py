@@ -18,10 +18,12 @@ class IndexManager:
     def get_head_index(self, level: int) -> str:
         index = self.__head_counter.get_next(level)
 
-        if self.__character:
+        if self.__character and index:
             index = self.__add_character(index)
 
-        if level == 0 and self.__index_type == IndexType.CHAPTER_RELATIVE:
+        # Новый раздел начинает нумерацию рисунков и таблиц заново: 1.1, 1.2,
+        # затем 2.1, 2.2. Нумерация самих разделов при этом сквозная.
+        if level == 1 and self.__index_type == IndexType.CHAPTER_RELATIVE:
             self.__reset_counters()
         return index
 
@@ -51,4 +53,4 @@ class IndexManager:
 
     def __reset_counters(self):
         self.__image_counter.reset()
-        self.__head_counter.reset()
+        self.__table_counter.reset()

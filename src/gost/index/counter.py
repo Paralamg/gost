@@ -21,6 +21,11 @@ class HeadCounter:
         }
 
     def get_next(self, head_level: int) -> str:
+        # Уровень 0 — структурный элемент, он не нумеруется и не участвует
+        # в нумерации разделов.
+        if head_level == 0:
+            return ""
+
         self.__levels_counter[head_level].get_next()
 
         result_number = str(self.__levels_counter[1].current)
