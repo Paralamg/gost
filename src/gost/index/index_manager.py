@@ -26,7 +26,13 @@ class IndexManager:
         return index
 
     def get_image_index(self):
-        index = str(self.__image_counter.get_next())
+        return self.__format_index(self.__image_counter.get_next())
+
+    def get_table_index(self):
+        return self.__format_index(self.__table_counter.get_next())
+
+    def __format_index(self, raw_index):
+        index = str(raw_index)
         if self.__index_type == IndexType.CHAPTER_RELATIVE:
             index = self.__add_chapter(index)
 
