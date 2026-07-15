@@ -25,8 +25,13 @@ class Grid:
 
     @property
     def head_rows(self) -> list[list[str]]:
-        """Шапка таблицы: имена столбцов и/или их номера."""
+        """Шапка первой части: имена столбцов и/или их номера."""
         return [row for row in (self.header, self.numbers) if row is not None]
+
+    @property
+    def repeated_rows(self) -> list[list[str]]:
+        """Шапка страницы-продолжения: только номера столбцов (ГОСТ 7.32)."""
+        return [] if self.numbers is None else [self.numbers]
 
 
 def build_grid(

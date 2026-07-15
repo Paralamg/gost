@@ -3,7 +3,7 @@ from typing import Any
 
 from gost.elements.head import Head
 from gost.elements.image import Image
-from gost.elements.table import Table
+from gost.elements.table import SplitAfter, Table
 from gost.elements.text import Text
 from gost.index.index_manager import IndexManager
 
@@ -32,6 +32,7 @@ class ElementFactory:
             show_header: bool = True,
             show_row_numbers: bool = True,
             show_column_numbers: bool = True,
+            split_after: SplitAfter = None,
     ) -> Table:
         index = self.__index_manager.get_table_index()
         return Table(
@@ -41,4 +42,5 @@ class ElementFactory:
             show_header=show_header,
             show_row_numbers=show_row_numbers,
             show_column_numbers=show_column_numbers,
+            split_after=split_after,
         )

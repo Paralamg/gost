@@ -15,7 +15,13 @@ CAPTION_SIZE = Pt(14)
 ROW_NUMBER_WIDTH = Cm(1.2)
 
 
-def write_caption(document: Document, text: str, *, align: WD_ALIGN_PARAGRAPH) -> None:
+def write_caption(
+        document: Document,
+        text: str,
+        *,
+        align: WD_ALIGN_PARAGRAPH,
+        page_break_before: bool = False,
+) -> None:
     """Пишет подпись таблицы отдельным абзацем."""
     paragraph = document.add_paragraph()
     paragraph.alignment = align
@@ -25,15 +31,27 @@ def write_caption(document: Document, text: str, *, align: WD_ALIGN_PARAGRAPH) -
     fmt.line_spacing_rule = WD_LINE_SPACING.SINGLE
     fmt.space_after = Pt(6)
     fmt.keep_with_next = True
+    if page_break_before:
+        fmt.page_break_before = True
 
     paragraph.add_run(text).font.size = CAPTION_SIZE
 
 
-def write_part(document: Document, grid: Grid, rows: list[list[str]]) -> None:
-    """Пишет строки одной таблицей.
+def write_part(
+        document: Document,
+        grid: Grid,
+        rows: list[list[str]],
+        *,
+        repeat_head: bool = False,
+) -> None:
+    """Пишет непрерывный блок строк как отдельную таблицу.
 
-    Шапка помечается «w:tblHeader»: если таблица не помещается на страницу,
-    Word разбивает её сам и повторяет шапку на каждой странице.
+    Args:
+        grid: Сетка целиком — нужна для ширины и раскладки столбцов.
+        rows: Строки этой части, включая её шапку.
+        repeat_head: Помечать ли шапку как повторяемую на каждой странице
+            («w:tblHeader»). Только для неразрывной таблицы: при ручном
+            разбиении шапка пишется в каждую часть явно.
     """
     table = document.add_table(rows=len(rows), cols=grid.width)
     table.style = TABLE_STYLE
@@ -55,8 +73,9 @@ def write_part(document: Document, grid: Grid, rows: list[list[str]]) -> None:
             paragraph._p.get_or_add_pPr().style = style_id
             paragraph.text = value
 
-    for row in table.rows[:len(grid.head_rows)]:
-        _repeat_as_header(row)
+    if repeat_head:
+        for row in table.rows[:len(grid.head_rows)]:
+            _repeat_as_header(row)
 
 
 def _column_widths(document: Document, grid: Grid) -> list[Length]:
@@ -72,9 +91,11 @@ def _column_widths(document: Document, grid: Grid) -> list[Length]:
 
 
 def _fix_layout(table: DocxTable, widths: list[Length]) -> None:
-    """Фиксирует ширины столбцов: «№ п/п» узкий, остальные поровну.
+    """Фиксирует ширины столбцов.
 
-    Ширины ячеек проставляет write_part — Word смотрит на них, а не на gridCol.
+    Без этого Word считает autofit для каждой таблицы отдельно, и части
+    разорванной таблицы разъезжаются по ширине. Ширины ячеек проставляет
+    write_part — Word смотрит на них, а не на gridCol.
     """
     table.autofit = False
     for column, width in zip(table.columns, widths):

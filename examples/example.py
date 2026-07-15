@@ -72,8 +72,28 @@ def main() -> None:
     # --- Таблица без подписи ---
     wb.add_element(factory.create_table({"X": [0.1, 0.2], "Y": [0.3, 0.4]}))
 
+    # --- Разрыв на новую страницу: «Продолжение табл. N» ---
+    # Строка 20 — последняя, которая помещается на страницу при этой вёрстке.
+    wb.add_element(factory.create_table(
+        _cost_data(60),
+        title="Себестоимость с переносом на следующую страницу",
+        split_after=[20],
+    ))
+
     wb.save(OUTPUT)
     print(f"Сохранено: {OUTPUT}")
+
+
+def _cost_data(rows: int) -> dict[str, list[str]]:
+    positions = ["Бетон", "ПГС", "Щебень", "ЖБИ", "Цемент", "Песок", "ПАВ"]
+    return {
+        "Позиция": [positions[i % len(positions)] for i in range(rows)],
+        "Выручка от реализации, тыс.руб.": [f"{8741.0 - i * 100:.1f}" for i in range(rows)],
+        "Материальные затраты, план": [f"{322.2 - i * 10:.2f}" for i in range(rows)],
+        "Материальные затраты, факт": [f"{151.8 + i * 10:.2f}" for i in range(rows)],
+        "Расходы на оплату труда, план": [f"{221.82 - i * 5:.2f}" for i in range(rows)],
+        "Расходы на оплату труда, факт": [f"{223.6 + i * 5:.2f}" for i in range(rows)],
+    }
 
 
 if __name__ == "__main__":
