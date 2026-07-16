@@ -1,7 +1,13 @@
 """Измерение реальной вёрстки документа."""
 
+import logging
+import time
 from pathlib import Path
 from typing import Protocol
+
+from gost.timing import logged_duration
+
+logger = logging.getLogger(__name__)
 
 WD_ACTIVE_END_PAGE_NUMBER = 3
 
@@ -62,16 +68,37 @@ class WordMeasurer:
         if self.__word is None:
             raise RuntimeError("WordMeasurer используется вне контекстного менеджера")
 
-        document = self.__word.Documents.Open(str(path.resolve()), False, True)
+        with logged_duration(logger, "Word открыл %s", path.name):
+            document = self.__word.Documents.Open(str(path.resolve()), False, True)
         try:
             table = document.Tables(table_index + 1)  # COM-коллекции 1-based
-            return _search(lambda row: _page_of(table, row), table.Rows.Count, after)
+            queries = 0
+
+            def page_of(row: int) -> int:
+                nonlocal queries
+                queries += 1
+                return _page_of(table, row)
+
+            start = time.perf_counter()
+            row = _search(page_of, table.Rows.Count, after)
+            logger.debug(
+                "Таблица #%d в документе (строк %d): граница найдена за %.3f с, "
+                "запросов к вёрстке %d, первая строка на следующей странице: %s",
+                table_index, table.Rows.Count, time.perf_counter() - start, queries, row,
+            )
+            return row
         finally:
             document.Close(False)
 
 
 def _page_of(table, row: int) -> int:
-    """Один запрос к вёрстке Word. Дорогой (~25 мс) — отсюда бинарный поиск."""
+    """Один запрос к вёрстке Word. Дорогой (~30 мс) — отсюда бинарный поиск.
+
+    Первый запрос после открытия документа заставляет Word пересчитать вёрстку
+    целиком и стоит на порядок больше: ~1 с на полусотне страниц, дальше растёт
+    линейно с их числом. Остальные запросы идут по готовой вёрстке и от размера
+    документа не зависят.
+    """
     return table.Rows(row + 1).Range.Information(WD_ACTIVE_END_PAGE_NUMBER)
 
 

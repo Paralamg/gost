@@ -10,6 +10,7 @@
 остальные измерены по вёрстке, которой уже не будет.
 """
 
+import logging
 from collections import deque
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -19,6 +20,9 @@ from docx.document import Document
 from gost.elements.element import ElementBase
 from gost.elements.table import Table
 from gost.layout.measurer import PageMeasurer
+from gost.timing import logged_duration
+
+logger = logging.getLogger(__name__)
 
 Build = Callable[[], tuple[Document, list[range]]]
 
@@ -48,14 +52,19 @@ def resolve_auto_splits(
         if isinstance(element, Table) and element.auto_split
     )
     max_passes = _max_passes(pending)
+    logger.debug("Автоподбор разрывов: таблиц %d, предел проходов %d",
+                 len(pending), max_passes)
 
-    for _ in range(max_passes):
+    for pass_no in range(1, max_passes + 1):
         document, spans = build()
         if not pending:
             return document
 
-        document.save(str(probe))
+        with logged_duration(logger, "Проход %d: пробник сохранён", pass_no):
+            document.save(str(probe))
+
         if not _place_next_split(pending, spans, measurer, probe):
+            logger.info("Автоподбор разрывов завершён за %d проходов", pass_no)
             return document
 
     raise RuntimeError(
@@ -94,12 +103,16 @@ def _place_next_split(
     while pending:
         i, table = pending[0]
         head_count, offset = _part_geometry(table)
-        row = measurer.first_row_on_later_page(
-            probe,
-            spans[i][-1],  # последняя, ещё не разбитая часть
-            head_count,
-        )
+        with logged_duration(logger, "Таблица %s: измерена часть %d",
+                             table.index, len(table.split_after) + 1):
+            row = measurer.first_row_on_later_page(
+                probe,
+                spans[i][-1],  # последняя, ещё не разбитая часть
+                head_count,
+            )
         if row is None:
+            logger.debug("Таблица %s: подбор закончен, частей %d, точки разрыва %s",
+                         table.index, len(table.split_after) + 1, table.split_after)
             pending.popleft()  # уместилась целиком
             continue
 
@@ -107,10 +120,17 @@ def _place_next_split(
         if split <= offset:
             # Не помещается даже первая строка части: дробить дальше некуда,
             # иначе зациклимся на пустой части.
+            logger.warning(
+                "Таблица %s: строка %d не помещается на страницу целиком, "
+                "разрыв невозможен — Word разорвёт часть сам, без подписи "
+                "«Продолжение таблицы»",
+                table.index, offset + 1,
+            )
             pending.popleft()
             continue
 
         table.split_after.append(split)
+        logger.debug("Таблица %s: разрыв после строки %d", table.index, split)
         return True
     return False
 
