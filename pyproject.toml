@@ -1,12 +1,26 @@
 [project]
 name = "gost-docx"
-version = "0.2.0"
-description = "Add your description here"
+version = "0.2.1"
+description = "Генерация документов Word (.docx), оформленных по ГОСТ 7.32-2017"
 readme = "README.md"
 authors = [
     { name = "Dmitry Klimov", email = "dmitry.v.klimov@gmail.com" }
 ]
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+keywords = ["docx", "word", "gost", "gost-7.32", "document", "report"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Natural Language :: Russian",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business",
+    "Topic :: Text Processing :: Markup",
+]
+
 dependencies = [
     "python-docx>=1.2.0",
 ]
@@ -14,6 +28,11 @@ dependencies = [
 [project.optional-dependencies]
 # split_after="auto": подбор точек разрыва по вёрстке реального Word.
 autosplit = ["pywin32>=306; sys_platform == 'win32'"]
+
+[project.urls]
+Homepage = "https://github.com/Paralamg/gost"
+Repository = "https://github.com/Paralamg/gost"
+Issues = "https://github.com/Paralamg/gost/issues"
 
 [build-system]
 requires = ["uv_build>=0.11.0,<0.12.0"]
