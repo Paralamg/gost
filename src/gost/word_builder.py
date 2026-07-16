@@ -8,7 +8,7 @@ from docx.document import Document
 
 from .elements.element import ElementBase
 from .elements.table import Table
-from .layout.autosplit import resolve_auto_splits
+from .layout.autosplit import render_with_auto_splits
 from .layout.measurer import PageMeasurer, WordMeasurer
 from .styles import apply_gost_styles
 from .timing import logged_duration
@@ -38,7 +38,7 @@ class WordBuilder:
         if any(isinstance(e, Table) and e.auto_split for e in self.__elements):
             document = self.__build_with_auto_splits(measurer)
         else:
-            document, _ = self.__build()
+            document = self.__build()
 
         with logged_duration(logger, "Документ записан на диск"):
             document.save(str(path))
@@ -50,30 +50,27 @@ class WordBuilder:
             workdir = stack.enter_context(tempfile.TemporaryDirectory())
             if measurer is None:
                 measurer = stack.enter_context(WordMeasurer())
-            return resolve_auto_splits(
-                self.__elements,
-                self.__build,
-                measurer,
-                Path(workdir) / "probe.docx",
-            )
 
-    def __build(self) -> tuple[Document, list[range]]:
-        """Собирает документ с нуля.
+            with logged_duration(logger, "Документ собран с автоподбором: элементов %d",
+                                 len(self.__elements)):
+                document = _new_document()
+                render_with_auto_splits(
+                    self.__elements,
+                    document,
+                    measurer,
+                    Path(workdir) / "probe.docx",
+                )
+            return document
 
-        Returns:
-            Документ и — для каждого элемента — диапазон индексов таблиц,
-            которые он сгенерировал. Диапазоны нужны, чтобы сопоставить
-            измеренную вёрстку с элементом.
-        """
-        # Пересобирается целиком на каждом проходе автоподбора, поэтому на больших
-        # документах это заметная часть времени.
+    def __build(self) -> Document:
         with logged_duration(logger, "Документ собран: элементов %d", len(self.__elements)):
-            document = new_document()
-            apply_gost_styles(document)
-
-            spans: list[range] = []
+            document = _new_document()
             for element in self.__elements:
-                before = len(document.tables)
                 element.render(document)
-                spans.append(range(before, len(document.tables)))
-        return document, spans
+        return document
+
+
+def _new_document() -> Document:
+    document = new_document()
+    apply_gost_styles(document)
+    return document

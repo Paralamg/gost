@@ -2,20 +2,23 @@
 
 Точку разрыва нельзя вычислить — высота строки зависит от переноса слов,
 а он от метрик шрифта, ширины ячейки и позиции таблицы на странице. Поэтому
-здесь вёрстка измеряется: документ рендерится, Word сообщает, на какой
+здесь вёрстка измеряется: документ сохраняется, Word сообщает, на какой
 странице оказалась каждая строка, и разрыв ставится ровно туда.
 
-Разрывы ставятся по одному. Разрыв сдвигает вниз всё, что за ним следует,
-поэтому за один проход можно доверять только первому измеренному разрыву —
-остальные измерены по вёрстке, которой уже не будет.
+Документ строится один раз, сверху вниз. Дойдя до таблицы с «auto», подбираем
+ей разрывы на месте: рисуем, измеряем, и если не уместилась — убираем
+нарисованное и рисуем заново с разрывом. Всё, что выше таблицы, к этому моменту
+уже окончательно, поэтому измерение достоверно, а переделывать приходится
+только саму таблицу — не документ целиком.
 """
 
 import logging
-from collections import deque
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 
 from docx.document import Document
+from docx.oxml.ns import qn
+from docx.oxml.xmlchemy import BaseOxmlElement
 
 from gost.elements.element import ElementBase
 from gost.elements.table import Table
@@ -24,118 +27,122 @@ from gost.timing import logged_duration
 
 logger = logging.getLogger(__name__)
 
-Build = Callable[[], tuple[Document, list[range]]]
 
-Pending = deque[tuple[int, Table]]
-
-
-def resolve_auto_splits(
+def render_with_auto_splits(
         elements: Sequence[ElementBase],
-        build: Build,
+        document: Document,
         measurer: PageMeasurer,
         probe: Path,
-) -> Document:
-    """Проставляет точки разрыва таблицам с split_after="auto".
+) -> None:
+    """Выводит элементы в документ, подбирая разрывы таблицам со split_after="auto".
 
     Args:
         elements: Элементы документа в порядке вывода.
-        build: Собирает документ заново и возвращает его вместе с диапазонами
-            индексов таблиц, которые сгенерировал каждый элемент.
+        document: Куда выводить. Стили уже должны быть применены.
         measurer: Чем измерять вёрстку.
         probe: Куда сохранять промежуточный документ для измерения.
-
-    Returns:
-        Документ, соответствующий подобранным точкам разрыва.
     """
-    pending: Pending = deque(
-        (i, element) for i, element in enumerate(elements)
-        if isinstance(element, Table) and element.auto_split
-    )
-    max_passes = _max_passes(pending)
-    logger.debug("Автоподбор разрывов: таблиц %d, предел проходов %d",
-                 len(pending), max_passes)
+    auto = sum(1 for e in elements if isinstance(e, Table) and e.auto_split)
+    logger.debug("Автоподбор разрывов: таблиц с «auto» %d из %d элементов",
+                 auto, len(elements))
 
-    for pass_no in range(1, max_passes + 1):
-        document, spans = build()
-        if not pending:
-            return document
+    for element in elements:
+        if isinstance(element, Table) and element.auto_split:
+            _fit_table(element, document, measurer, probe)
+        else:
+            element.render(document)
 
-        with logged_duration(logger, "Проход %d: пробник сохранён", pass_no):
-            document.save(str(probe))
 
-        if not _place_next_split(pending, spans, measurer, probe):
-            logger.info("Автоподбор разрывов завершён за %d проходов", pass_no)
-            return document
+def _fit_table(
+        table: Table,
+        document: Document,
+        measurer: PageMeasurer,
+        probe: Path,
+) -> None:
+    """Подбирает таблице точки разрыва и оставляет её в документе.
+
+    Каждая попытка добавляет ровно один разрыв, а разрывов в таблице не больше,
+    чем строк в её теле, — дальше дробить нечего. Предел попыток поэтому просто
+    страховка от зацикливания, а не бюджет.
+    """
+    for _ in range(len(table.grid.body) + 1):
+        blocks = _render(table, document)
+        split = _overflow_split(table, document, measurer, probe)
+        if split is None:
+            logger.debug("Таблица %s: подбор закончен, частей %d, точки разрыва %s",
+                         table.index, len(table.split_after) + 1, table.split_after)
+            return
+
+        # Разрыв меняет вёрстку самой таблицы, поэтому её надо перерисовать —
+        # но только её: всё, что выше, разрыв не задевает.
+        _remove(document, blocks)
+        table.split_after.append(split)
+        logger.debug("Таблица %s: разрыв после строки %d", table.index, split)
 
     raise RuntimeError(
-        f"Не удалось подобрать точки разрыва за {max_passes} проходов. "
+        f"Таблица {table.index}: не удалось подобрать точки разрыва. "
         "Задайте split_after явно."
     )
 
 
-def _max_passes(pending: Pending) -> int:
-    """Предел числа проходов — страховка от зацикливания, а не бюджет.
-
-    За проход ставится не больше одного разрыва, а разрывов в таблице не больше,
-    чем строк в её теле, — дальше дробить нечего. Лимит поэтому щедрый: упереться
-    в него можно только из-за ошибки. Считать его от числа таблиц нельзя — на
-    документе с сотней таблиц фиксированный лимит срабатывал бы на исправной
-    вёрстке.
-    """
-    return sum(len(table.grid.body) for _, table in pending) + 1
-
-
-def _place_next_split(
-        pending: Pending,
-        spans: list[range],
+def _overflow_split(
+        table: Table,
+        document: Document,
         measurer: PageMeasurer,
         probe: Path,
-) -> bool:
-    """Ставит один разрыв первой таблице, которой он нужен. True — если поставил.
+) -> int | None:
+    """Строка тела, после которой последней части нужен разрыв.
 
-    Разобранные таблицы выбрасываются из pending и больше не измеряются. Это
-    корректно: таблицы идут по документу сверху вниз, а разрыв всегда ставится в
-    самую верхнюю из нуждающихся, поэтому всё, что могло бы сдвинуть уже
-    уместившуюся таблицу, находится ниже неё. Без этого каждый проход заново
-    пересчитывал бы вёрстку ради готовых таблиц — а пересчёт стоит O(размера
-    документа), и на сотне таблиц подбор становится квадратичным.
+    Returns:
+        Номер строки (1-based) или None, если разрыв не нужен либо невозможен.
     """
-    while pending:
-        i, table = pending[0]
-        head_count, offset = _part_geometry(table)
-        with logged_duration(logger, "Таблица %s: измерена часть %d",
-                             table.index, len(table.split_after) + 1):
-            row = measurer.first_row_on_later_page(
-                probe,
-                spans[i][-1],  # последняя, ещё не разбитая часть
-                head_count,
-            )
-        if row is None:
-            logger.debug("Таблица %s: подбор закончен, частей %d, точки разрыва %s",
-                         table.index, len(table.split_after) + 1, table.split_after)
-            pending.popleft()  # уместилась целиком
-            continue
-
-        split = offset + (row - head_count)
-        if split <= offset:
-            # Не помещается даже первая строка части: дробить дальше некуда,
-            # иначе зациклимся на пустой части.
-            logger.warning(
-                "Таблица %s: строка %d не помещается на страницу целиком, "
-                "разрыв невозможен — Word разорвёт часть сам, без подписи "
-                "«Продолжение таблицы»",
-                table.index, offset + 1,
-            )
-            pending.popleft()
-            continue
-
-        table.split_after.append(split)
-        logger.debug("Таблица %s: разрыв после строки %d", table.index, split)
-        return True
-    return False
-
-
-def _part_geometry(table: Table) -> tuple[int, int]:
-    """Сколько строк занимает шапка последней части и сколько строк тела до неё."""
+    part = len(table.split_after) + 1
+    head_count = len(table.grid.head_rows)
     offset = table.split_after[-1] if table.split_after else 0
-    return len(table.grid.head_rows), offset
+
+    with logged_duration(logger, "Таблица %s: пробник с частью %d сохранён",
+                         table.index, part):
+        document.save(str(probe))
+
+    with logged_duration(logger, "Таблица %s: часть %d измерена", table.index, part):
+        row = measurer.first_row_on_later_page(probe, _last_table_index(document),
+                                               head_count)
+    if row is None:
+        return None  # уместилась
+
+    split = offset + (row - head_count)
+    if split <= offset:
+        # Не помещается даже первая строка части: дробить дальше некуда, иначе
+        # зациклимся на пустой части.
+        logger.warning(
+            "Таблица %s: строка %d не помещается на страницу целиком, разрыв "
+            "невозможен — Word разорвёт часть сам, без подписи «Продолжение таблицы»",
+            table.index, offset + 1,
+        )
+        return None
+    return split
+
+
+def _last_table_index(document: Document) -> int:
+    """Индекс последней таблицы документа — это последняя часть той, что мы мерим."""
+    return len(document.element.body.findall(qn("w:tbl"))) - 1
+
+
+def _render(element: ElementBase, document: Document) -> list[BaseOxmlElement]:
+    """Выводит элемент и возвращает блоки, которые он добавил в документ."""
+    body = document.element.body
+    # Список обязателен: lxml создаёт обёртки узлов на лету и уничтожает сразу,
+    # как только на них нет ссылки, а id() уничтоженной переиспользуется под
+    # другой узел. Без живых ссылок сравнение по id() перепутает узлы и снесёт
+    # чужие — например w:sectPr.
+    before = list(body)
+    known = {id(block) for block in before}
+    element.render(document)
+    return [block for block in body if id(block) not in known]
+
+
+def _remove(document: Document, blocks: list[BaseOxmlElement]) -> None:
+    """Убирает блоки неудачной попытки. Таблица добавляет только их — следов не остаётся."""
+    body = document.element.body
+    for block in blocks:
+        body.remove(block)
