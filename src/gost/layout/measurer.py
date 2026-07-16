@@ -10,6 +10,14 @@ from gost.timing import logged_duration
 logger = logging.getLogger(__name__)
 
 WD_ACTIVE_END_PAGE_NUMBER = 3
+CONFIRM_CONVERSIONS = False
+
+# Документ, открытый только на чтение, Word верстает не так, как печатает:
+# на 60 рисунках он насчитывает 20 страниц вместо 30, на тексте — 40 вместо 37.
+# Ошибка в обе стороны, и Repaginate() её не лечит; сверка с экспортом в PDF —
+# то есть с тем, что реально увидит читатель, — сходится только при открытии на
+# запись. Документ мы всё равно закрываем без сохранения.
+OPEN_READ_ONLY = False
 
 
 class PageMeasurer(Protocol):
@@ -69,7 +77,9 @@ class WordMeasurer:
             raise RuntimeError("WordMeasurer используется вне контекстного менеджера")
 
         with logged_duration(logger, "Word открыл %s", path.name):
-            document = self.__word.Documents.Open(str(path.resolve()), False, True)
+            document = self.__word.Documents.Open(
+                str(path.resolve()), CONFIRM_CONVERSIONS, OPEN_READ_ONLY,
+            )
         try:
             table = document.Tables(table_index + 1)  # COM-коллекции 1-based
             queries = 0
