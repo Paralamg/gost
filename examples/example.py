@@ -2,6 +2,7 @@
 Генерирует example.docx для визуальной проверки всех стилей WordBuilder.
 Запуск: python examples/example.py
 """
+import logging
 from pathlib import Path
 
 from gost import WordBuilder
@@ -103,8 +104,7 @@ def main() -> None:
     wb.add_element(factory.create_page_break(BreakType.PAGE))
     wb.add_element(factory.create_text("Этот абзац начинается с новой страницы того же раздела."))
 
-    wb.save(OUTPUT)
-    print(f"Сохранено: {OUTPUT}")
+    wb.save(OUTPUT)  # об успешном сохранении сообщит сам WordBuilder, на уровне INFO
 
 
 def _cost_data(rows: int) -> dict[str, list[str]]:
@@ -120,4 +120,6 @@ def _cost_data(rows: int) -> dict[str, list[str]]:
 
 
 if __name__ == "__main__":
+    # DEBUG вместо INFO покажет время вывода каждой таблицы и рисунка.
+    logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(name)s: %(message)s")
     main()
