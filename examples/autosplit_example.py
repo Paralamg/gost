@@ -11,9 +11,6 @@
 Требует Windows, установленный Word и pywin32:
     pip install gost-docx[autosplit]
 
-Уровень DEBUG показывает, из чего складывается время подбора: пересборка
-документа, сохранение пробника, открытие в Word и поиск границы страницы.
-
 Запуск: python examples/autosplit_example.py
 """
 import logging
@@ -56,8 +53,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # DEBUG вместо INFO покажет, из чего складывается время подбора: пересборка
+    # документа, сохранение пробника, открытие в Word и поиск границы страницы.
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(relativeCreated)6.0f мс  %(levelname)-7s %(name)s: %(message)s",
     )
     main()
