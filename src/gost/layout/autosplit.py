@@ -10,6 +10,7 @@
 остальные измерены по вёрстке, которой уже не будет.
 """
 
+from collections import deque
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from gost.layout.measurer import PageMeasurer
 
 Build = Callable[[], tuple[Document, list[range]]]
 
-MAX_PASSES = 200
+Pending = deque[tuple[int, Table]]
 
 
 def resolve_auto_splits(
@@ -42,34 +43,56 @@ def resolve_auto_splits(
     Returns:
         Документ, соответствующий подобранным точкам разрыва.
     """
-    auto = [i for i, element in enumerate(elements)
-            if isinstance(element, Table) and element.auto_split]
+    pending: Pending = deque(
+        (i, element) for i, element in enumerate(elements)
+        if isinstance(element, Table) and element.auto_split
+    )
+    max_passes = _max_passes(pending)
 
-    for _ in range(MAX_PASSES):
+    for _ in range(max_passes):
         document, spans = build()
-        if not auto:
+        if not pending:
             return document
 
         document.save(str(probe))
-        if not _place_next_split(elements, auto, spans, measurer, probe):
+        if not _place_next_split(pending, spans, measurer, probe):
             return document
 
     raise RuntimeError(
-        f"Не удалось подобрать точки разрыва за {MAX_PASSES} проходов. "
+        f"Не удалось подобрать точки разрыва за {max_passes} проходов. "
         "Задайте split_after явно."
     )
 
 
+def _max_passes(pending: Pending) -> int:
+    """Предел числа проходов — страховка от зацикливания, а не бюджет.
+
+    За проход ставится не больше одного разрыва, а разрывов в таблице не больше,
+    чем строк в её теле, — дальше дробить нечего. Лимит поэтому щедрый: упереться
+    в него можно только из-за ошибки. Считать его от числа таблиц нельзя — на
+    документе с сотней таблиц фиксированный лимит срабатывал бы на исправной
+    вёрстке.
+    """
+    return sum(len(table.grid.body) for _, table in pending) + 1
+
+
 def _place_next_split(
-        elements: Sequence[ElementBase],
-        auto: list[int],
+        pending: Pending,
         spans: list[range],
         measurer: PageMeasurer,
         probe: Path,
 ) -> bool:
-    """Ставит один разрыв первой таблице, которой он нужен. True — если поставил."""
-    for i in auto:
-        table = elements[i]
+    """Ставит один разрыв первой таблице, которой он нужен. True — если поставил.
+
+    Разобранные таблицы выбрасываются из pending и больше не измеряются. Это
+    корректно: таблицы идут по документу сверху вниз, а разрыв всегда ставится в
+    самую верхнюю из нуждающихся, поэтому всё, что могло бы сдвинуть уже
+    уместившуюся таблицу, находится ниже неё. Без этого каждый проход заново
+    пересчитывал бы вёрстку ради готовых таблиц — а пересчёт стоит O(размера
+    документа), и на сотне таблиц подбор становится квадратичным.
+    """
+    while pending:
+        i, table = pending[0]
         head_count, offset = _part_geometry(table)
         row = measurer.first_row_on_later_page(
             probe,
@@ -77,14 +100,18 @@ def _place_next_split(
             head_count,
         )
         if row is None:
+            pending.popleft()  # уместилась целиком
             continue
 
         split = offset + (row - head_count)
-        # split == offset — не помещается даже первая строка части: дробить дальше
-        # некуда, иначе зациклимся на пустой части.
-        if split > offset:
-            table.split_after.append(split)
-            return True
+        if split <= offset:
+            # Не помещается даже первая строка части: дробить дальше некуда,
+            # иначе зациклимся на пустой части.
+            pending.popleft()
+            continue
+
+        table.split_after.append(split)
+        return True
     return False
 
 
