@@ -1,6 +1,7 @@
 from docx.document import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
@@ -8,9 +9,27 @@ from docx.shared import Cm, Pt, RGBColor
 def apply_gost_styles(doc: Document) -> None:
     """Configure GOST 7.32-2001 paragraph and heading styles on *doc* in-place."""
     _apply_section(doc)
+    _apply_language(doc)
     _apply_normal_style(doc)
     _apply_table_text_style(doc)
     _apply_heading_styles(doc)
+
+
+def _apply_language(doc: Document) -> None:
+    """Объявить язык документа русским.
+
+    Шаблон python-docx задаёт в docDefaults язык en-US, и весь текст его
+    наследует — Word проверяет русские слова по английскому словарю и
+    подчёркивает их как ошибочные.
+    """
+    rpr = doc.styles.element.find(
+        f"{qn('w:docDefaults')}/{qn('w:rPrDefault')}/{qn('w:rPr')}"
+    )
+    lang = rpr.find(qn("w:lang"))
+    if lang is None:
+        lang = OxmlElement("w:lang")
+        rpr.append(lang)
+    lang.set(qn("w:val"), "ru-RU")
 
 def _apply_section(doc: Document) -> None:
     # Page margins per ГОСТ 7.32-2001: left ≥ 30mm, right ≥ 10mm, top ≥ 20mm, bottom ≥ 20mm
