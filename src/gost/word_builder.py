@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from contextlib import ExitStack
 from pathlib import Path
@@ -10,6 +11,9 @@ from .elements.table import Table
 from .layout.autosplit import resolve_auto_splits
 from .layout.measurer import PageMeasurer, WordMeasurer
 from .styles import apply_gost_styles
+from .timing import logged_duration
+
+logger = logging.getLogger(__name__)
 
 
 class WordBuilder:
@@ -36,7 +40,10 @@ class WordBuilder:
         else:
             document, _ = self.__build()
 
-        document.save(str(path))
+        with logged_duration(logger, "Документ записан на диск"):
+            document.save(str(path))
+        logger.info("Документ сохранён: %s (элементов: %d, таблиц: %d)",
+                    path, len(self.__elements), len(document.tables))
 
     def __build_with_auto_splits(self, measurer: PageMeasurer | None) -> Document:
         with ExitStack() as stack:
@@ -58,12 +65,15 @@ class WordBuilder:
             которые он сгенерировал. Диапазоны нужны, чтобы сопоставить
             измеренную вёрстку с элементом.
         """
-        document = new_document()
-        apply_gost_styles(document)
+        # Пересобирается целиком на каждом проходе автоподбора, поэтому на больших
+        # документах это заметная часть времени.
+        with logged_duration(logger, "Документ собран: элементов %d", len(self.__elements)):
+            document = new_document()
+            apply_gost_styles(document)
 
-        spans: list[range] = []
-        for element in self.__elements:
-            before = len(document.tables)
-            element.render(document)
-            spans.append(range(before, len(document.tables)))
+            spans: list[range] = []
+            for element in self.__elements:
+                before = len(document.tables)
+                element.render(document)
+                spans.append(range(before, len(document.tables)))
         return document, spans

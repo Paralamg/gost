@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from docx.document import Document
@@ -5,6 +6,9 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Cm, Pt
 
 from gost.elements.element import NumberedElement
+from gost.timing import logged_duration
+
+logger = logging.getLogger(__name__)
 
 
 class Image(NumberedElement):
@@ -23,11 +27,15 @@ class Image(NumberedElement):
 
     def render(self, document: Document) -> None:
         if self.path.exists():
-            document.add_picture(str(self.path), width=Cm(16.5))
+            # Вставка читает и перекодирует файл — на тяжёлых картинках заметно.
+            with logged_duration(logger, "Рисунок %s вставлен: %s", self.index, self.path.name):
+                document.add_picture(str(self.path), width=Cm(16.5))
             picture = document.paragraphs[-1]
             picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
             picture.paragraph_format.first_line_indent = Cm(0)
         else:
+            logger.warning("Рисунок %s: файл не найден, вставлена заглушка: %s",
+                           self.index, self.path)
             picture = document.add_paragraph(f"[Изображение не найдено: {self.path}]")
 
         # Подпись рисунка идёт под ним, поэтому «не отрывать от следующего»

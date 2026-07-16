@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -6,6 +7,9 @@ from docx.document import Document
 from gost.elements.element import NumberedElement
 from gost.elements.table_grid import build_grid
 from gost.elements.table_writer import write_caption, write_part
+from gost.timing import logged_duration
+
+logger = logging.getLogger(__name__)
 
 CAPTION = "Таблица {index} – {title}"
 CONTINUATION = "Продолжение таблицы {index}"
@@ -70,21 +74,25 @@ class Table(NumberedElement):
     def render(self, document: Document) -> None:
         first, *rest = _split(self.grid.body, self.split_after)
 
-        # Подпись есть у каждой таблицы, поэтому она же отделяет её от предыдущей:
-        # два w:tbl подряд Word слил бы в одну таблицу.
-        write_caption(document, CAPTION.format(index=self.index, title=self.title))
+        with logged_duration(
+                logger, "Таблица %s выведена: строк %d, столбцов %d, частей %d",
+                self.index, len(self.grid.body), self.grid.width, len(rest) + 1,
+        ):
+            # Подпись есть у каждой таблицы, поэтому она же отделяет её от предыдущей:
+            # два w:tbl подряд Word слил бы в одну таблицу.
+            write_caption(document, CAPTION.format(index=self.index, title=self.title))
 
-        # Повтор шапки силами Word — только когда мы не разбиваем таблицу сами,
-        # иначе шапка задвоится на странице продолжения.
-        write_part(document, self.grid, self.grid.head_rows + first, repeat_head=not rest)
+            # Повтор шапки силами Word — только когда мы не разбиваем таблицу сами,
+            # иначе шапка задвоится на странице продолжения.
+            write_part(document, self.grid, self.grid.head_rows + first, repeat_head=not rest)
 
-        for part in rest:
-            write_caption(
-                document,
-                CONTINUATION.format(index=self.index),
-                page_break_before=True,
-            )
-            write_part(document, self.grid, self.grid.head_rows + part)
+            for part in rest:
+                write_caption(
+                    document,
+                    CONTINUATION.format(index=self.index),
+                    page_break_before=True,
+                )
+                write_part(document, self.grid, self.grid.head_rows + part)
 
 
 def _validate_splits(split_after: Sequence[int] | None, row_count: int) -> list[int]:
