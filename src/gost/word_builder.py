@@ -19,6 +19,9 @@ class WordBuilder:
     def add_element(self, element: ElementBase) -> None:
         self.__elements.append(element)
 
+    def add_elements(self, elements: list[ElementBase]) -> None:
+        self.__elements.extend(elements)
+
     def save(self, path: Path, measurer: PageMeasurer | None = None) -> None:
         """Собирает документ и сохраняет его в файл формата .docx.
 
