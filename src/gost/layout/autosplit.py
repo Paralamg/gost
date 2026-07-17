@@ -24,6 +24,7 @@ from docx.document import Document
 from gost.elements.element import ElementBase
 from gost.elements.table import Table
 from gost.layout.measurer import LayoutMirror
+from gost.progress import tracked
 from gost.timing import logged_duration
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ def render_with_auto_splits(
     chunks = _Chunks(new_document, workdir)
     pending: list[ElementBase] = []
 
-    for element in elements:
+    for element in tracked(elements, "Сборка документа"):
         if isinstance(element, Table) and element.auto_split:
             # Зеркало должно догнать документ до этой таблицы, иначе она встанет
             # не на своё место и померится не там.

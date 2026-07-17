@@ -10,6 +10,7 @@ from .elements.element import ElementBase
 from .elements.table import Table
 from .layout.autosplit import render_with_auto_splits
 from .layout.measurer import LayoutMirror, WordMirror
+from .progress import tracked
 from .styles import apply_gost_styles
 from .timing import logged_duration
 
@@ -66,7 +67,7 @@ class WordBuilder:
     def __build(self) -> Document:
         with logged_duration(logger, "Документ собран: элементов %d", len(self.__elements)):
             document = _new_document()
-            for element in self.__elements:
+            for element in tracked(self.__elements, "Сборка документа"):
                 element.render(document)
         return document
 
