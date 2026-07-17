@@ -1,6 +1,6 @@
 [project]
 name = "gost-docx"
-version = "0.2.4"
+version = "0.2.5"
 description = "Генерация документов Word (.docx), оформленных по ГОСТ 7.32-2017"
 readme = "README.md"
 authors = [
