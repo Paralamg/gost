@@ -12,18 +12,18 @@ import time
 from pathlib import Path
 from typing import Protocol
 
+from docx import Document as read_document
+from docx.oxml.ns import qn
+
 from gost.timing import logged_duration
 
 logger = logging.getLogger(__name__)
 
 WD_ACTIVE_END_PAGE_NUMBER = 3
-WD_WITH_IN_TABLE = 12
-WD_COLLAPSE_START = 1
-WD_COLLAPSE_END = 0
 CONFIRM_CONVERSIONS = False
 
-# Знак абзаца и знак конца ячейки — Word отдаёт их в тексте диапазона.
-PARAGRAPH_MARKS = "\r\a"
+# Пустой документ — это один пустой абзац; он же и весь хвост зеркала на старте.
+_TRAILING_IN_EMPTY_DOCUMENT = 1
 
 # Документ, открытый только на чтение, Word верстает не так, как печатает: на
 # 60 рисунках насчитывает 20 страниц вместо 30, на тексте — 40 вместо 37.
@@ -73,6 +73,11 @@ class WordMirror:
         self.__base = base
         self.__word = None
         self.__document = None
+        # Сколько пустых абзацев в хвосте зеркала. Считать их дешевле, чем
+        # искать: перебор абзацев Word делает проходом от начала документа, и на
+        # каждую вставку это стоило бы O(размера зеркала).
+        self.__trailing = _TRAILING_IN_EMPTY_DOCUMENT
+        self.__trailing_before_append = _TRAILING_IN_EMPTY_DOCUMENT
 
     def __enter__(self) -> "WordMirror":
         try:
@@ -132,45 +137,22 @@ class WordMirror:
         абзац куска с последним абзацем зеркала.
         """
         with logged_duration(logger, "Зеркало: дописан кусок %s", chunk.name):
-            self.__insertion_point().InsertFile(str(chunk.resolve()))
+            start = self.__live.Content.End - self.__trailing
+            point = self.__live.Range(start, start)
 
-    def __insertion_point(self):
-        artifact = self.__first_trailing_empty_paragraph()
-        if artifact is not None:
-            artifact.Collapse(WD_COLLAPSE_START)
-            return artifact
-
-        end = self.__live.Content
-        end.Collapse(WD_COLLAPSE_END)
-        return end
-
-    def __first_trailing_empty_paragraph(self):
-        """Начало цепочки пустых абзацев в конце зеркала. None, если её нет.
-
-        Идём от конца через Last и Previous. Это проход по зеркалу, и он тем
-        дороже, чем оно больше: абзацы Word отдаёт только перебором от начала
-        документа. Обойтись без перебора не вышло — считать позицию абзаца
-        арифметикой по Content.End нельзя, Word приписывает свой абзац внутрь
-        вставленного диапазона, и вычисленная позиция уезжает на чужой знак.
-        """
-        paragraph = self.__live.Paragraphs.Last
-        first = None
-        while paragraph is not None:
-            span = paragraph.Range
-            if span.Information(WD_WITH_IN_TABLE):
-                break  # не абзац документа, а ячейка таблицы
-            if span.Text.strip(PARAGRAPH_MARKS):
-                break  # абзац с текстом — часть документа, а не след вставки
-            first = span
-            paragraph = _previous(paragraph)
-        return first
+            self.__trailing_before_append = self.__trailing
+            point.InsertFile(str(chunk.resolve()))
+            if _ends_with_table(chunk):
+                self.__trailing += 1
 
     def undo(self) -> None:
         # Собственный Undo Word отменяет вставку точно. Считать позиции в Range
-        # и удалять диапазон — нельзя: вставка оставляет за собой пустой абзац,
-        # зеркало разъезжается с документом, и вёрстка едет вместе с ним.
+        # и удалять диапазон — нельзя: Word бережёт последний абзац документа и
+        # оставляет его, зеркало разъезжается с документом, и вёрстка едет
+        # вместе с ним.
         if not self.__live.Undo():
             raise RuntimeError("Word не смог отменить вставку в зеркало")
+        self.__trailing = self.__trailing_before_append
 
     def first_row_on_later_page(self, after: int) -> int | None:
         table = self.__live.Tables(self.__live.Tables.Count)  # последняя — та, что мерим
@@ -197,12 +179,16 @@ class WordMirror:
         return self.__document
 
 
-def _previous(paragraph):
-    """Абзац перед данным. None, если это первый абзац документа."""
-    try:
-        return paragraph.Previous()
-    except Exception:
-        return None  # Word бросает, а не возвращает пустоту, дойдя до начала
+def _ends_with_table(chunk: Path) -> bool:
+    """Заканчивается ли кусок таблицей — тогда Word припишет ему пустой абзац.
+
+    Читаем сам файл: он размером с элемент, а спросить о том же Word значило бы
+    пройти по всему зеркалу.
+    """
+    body = read_document(str(chunk)).element.body
+    blocks = [child for child in body.iterchildren()
+              if child.tag in (qn("w:p"), qn("w:tbl"))]
+    return bool(blocks) and blocks[-1].tag == qn("w:tbl")
 
 
 def _search(page_of, row_count: int, after: int) -> int | None:
