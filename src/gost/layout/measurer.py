@@ -17,8 +17,13 @@ from gost.timing import logged_duration
 logger = logging.getLogger(__name__)
 
 WD_ACTIVE_END_PAGE_NUMBER = 3
+WD_WITH_IN_TABLE = 12
+WD_COLLAPSE_START = 1
 WD_COLLAPSE_END = 0
 CONFIRM_CONVERSIONS = False
+
+# Знак абзаца и знак конца ячейки — Word отдаёт их в тексте диапазона.
+PARAGRAPH_MARKS = "\r\a"
 
 # Документ, открытый только на чтение, Word верстает не так, как печатает: на
 # 60 рисунках насчитывает 20 страниц вместо 30, на тексте — 40 вместо 37.
@@ -79,20 +84,32 @@ class WordMirror:
             ) from e
 
         try:
-            self.__word = win32com.client.Dispatch("Word.Application")
+            # DispatchEx, а не Dispatch: Dispatch подключается к уже запущенному
+            # Word пользователя, и тогда Quit() на выходе закрыл бы его вместе с
+            # открытыми в нём документами. DispatchEx поднимает отдельный
+            # процесс, который принадлежит только нам.
+            self.__word = win32com.client.DispatchEx("Word.Application")
         except Exception as e:
             raise RuntimeError(
                 'Для split_after="auto" нужен установленный Microsoft Word. '
                 "Либо задайте точки разрыва явно: split_after=[...]."
             ) from e
 
-        self.__word.Visible = False
-        self.__document = self.__word.Documents.Open(
-            str(self.__base.resolve()), CONFIRM_CONVERSIONS, OPEN_READ_ONLY,
-        )
+        try:
+            self.__word.Visible = False
+            self.__document = self.__word.Documents.Open(
+                str(self.__base.resolve()), CONFIRM_CONVERSIONS, OPEN_READ_ONLY,
+            )
+        except BaseException:
+            # Упавший __enter__ не приводит к __exit__ — Word остался бы висеть.
+            self.__close()
+            raise
         return self
 
     def __exit__(self, *exc) -> None:
+        self.__close()
+
+    def __close(self) -> None:
         if self.__document is not None:
             self.__document.Close(False)
             self.__document = None
@@ -102,9 +119,48 @@ class WordMirror:
 
     def append(self, chunk: Path) -> None:
         with logged_duration(logger, "Зеркало: дописан кусок %s", chunk.name):
-            end = self.__live.Content
-            end.Collapse(WD_COLLAPSE_END)
-            end.InsertFile(str(chunk.resolve()))
+            self.__insertion_point().InsertFile(str(chunk.resolve()))
+
+    def __insertion_point(self):
+        """Куда вставлять кусок, чтобы зеркало осталось копией документа.
+
+        Word не даёт документу заканчиваться таблицей и сам ставит за ней пустой
+        абзац. Вставка в самый конец легла бы за этим абзацем, и он остался бы
+        внутри зеркала — в документе такого абзаца нет. Они копятся по одному на
+        таблицу, всё, что ниже, съезжает, и таблица меряется не там, где
+        окажется у читателя.
+
+        Поэтому в такой абзац и вставляем: кусок встаёт перед ним, а сам он
+        вытесняется вниз — под последнюю таблицу, где меряться уже нечему.
+        Удалять его нельзя: без него вставке не за что зацепиться, и Word
+        сливает первый абзац куска с последним абзацем зеркала.
+        """
+        artifact = self.__first_trailing_empty_paragraph()
+        if artifact is not None:
+            artifact.Collapse(WD_COLLAPSE_START)
+            return artifact
+
+        end = self.__live.Content
+        end.Collapse(WD_COLLAPSE_END)
+        return end
+
+    def __first_trailing_empty_paragraph(self):
+        """Начало цепочки пустых абзацев в конце зеркала. None, если её нет.
+
+        Пустых абзацев в хвосте несколько: свой у зеркала и по одному за каждую
+        вставку, закончившуюся таблицей. Вставлять надо в первый из них — иначе
+        те, что выше, останутся выше куска и утянут вёрстку вниз.
+        """
+        paragraphs = self.__live.Paragraphs
+        first = None
+        for i in range(paragraphs.Count, 0, -1):
+            paragraph = paragraphs(i).Range
+            if paragraph.Information(WD_WITH_IN_TABLE):
+                break  # не абзац документа, а ячейка таблицы
+            if paragraph.Text.strip(PARAGRAPH_MARKS):
+                break  # абзац с текстом — часть документа, а не след вставки
+            first = paragraph
+        return first
 
     def undo(self) -> None:
         # Собственный Undo Word отменяет вставку точно. Считать позиции в Range
