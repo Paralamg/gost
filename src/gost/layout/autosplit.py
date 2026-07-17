@@ -1,81 +1,91 @@
 """Подбор точек разрыва таблиц по измеренной вёрстке.
 
-Точку разрыва нельзя вычислить — высота строки зависит от переноса слов,
-а он от метрик шрифта, ширины ячейки и позиции таблицы на странице. Поэтому
-здесь вёрстка измеряется: документ сохраняется, Word сообщает, на какой
-странице оказалась каждая строка, и разрыв ставится ровно туда.
+Точку разрыва нельзя вычислить — высота строки зависит от переноса слов, а он
+от метрик шрифта, ширины ячейки и позиции таблицы на странице. Поэтому вёрстка
+измеряется: Word сообщает, на какой странице оказалась каждая строка, и разрыв
+ставится ровно туда.
 
-Документ строится один раз, сверху вниз. Дойдя до таблицы с «auto», подбираем
-ей разрывы на месте: рисуем, измеряем, и если не уместилась — убираем
-нарисованное и рисуем заново с разрывом. Всё, что выше таблицы, к этому моменту
-уже окончательно, поэтому измерение достоверно, а переделывать приходится
-только саму таблицу — не документ целиком.
+Документ строится один раз, сверху вниз, и параллельно повторяется в зеркале —
+том же документе, открытом в Word. Дойдя до таблицы с «auto», досылаем в
+зеркало всё, что накопилось перед ней, и подбираем разрывы: дописываем таблицу,
+меряем, а если не уместилась — отменяем вставку и дописываем заново с разрывом.
+
+Всё, что выше таблицы, к этому моменту уже окончательно, поэтому измерение
+достоверно. А раз зеркало только достраивается с конца, Word пересчитывает
+вёрстку от места вставки, а не целиком.
 """
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from docx.document import Document
-from docx.oxml.ns import qn
-from docx.oxml.xmlchemy import BaseOxmlElement
 
 from gost.elements.element import ElementBase
 from gost.elements.table import Table
-from gost.layout.measurer import PageMeasurer
+from gost.layout.measurer import LayoutMirror
 from gost.timing import logged_duration
 
 logger = logging.getLogger(__name__)
+
+NewDocument = Callable[[], Document]
 
 
 def render_with_auto_splits(
         elements: Sequence[ElementBase],
         document: Document,
-        measurer: PageMeasurer,
-        probe: Path,
+        mirror: LayoutMirror,
+        new_document: NewDocument,
+        workdir: Path,
 ) -> None:
     """Выводит элементы в документ, подбирая разрывы таблицам со split_after="auto".
 
     Args:
         elements: Элементы документа в порядке вывода.
         document: Куда выводить. Стили уже должны быть применены.
-        measurer: Чем измерять вёрстку.
-        probe: Куда сохранять промежуточный документ для измерения.
+        mirror: Зеркало документа, по которому меряется вёрстка.
+        new_document: Создаёт пустой документ с теми же стилями — для кусков.
+        workdir: Куда складывать куски для зеркала.
     """
     auto = sum(1 for e in elements if isinstance(e, Table) and e.auto_split)
     logger.debug("Автоподбор разрывов: таблиц с «auto» %d из %d элементов",
                  auto, len(elements))
 
+    chunks = _Chunks(new_document, workdir)
+    pending: list[ElementBase] = []
+
     for element in elements:
         if isinstance(element, Table) and element.auto_split:
-            _fit_table(element, document, measurer, probe)
+            # Зеркало должно догнать документ до этой таблицы, иначе она встанет
+            # не на своё место и померится не там.
+            if pending:
+                mirror.append(chunks.of(pending))
+                pending.clear()
+            _fit_table(element, mirror, chunks)
+            element.render(document)  # уже с подобранными разрывами
         else:
             element.render(document)
+            pending.append(element)
+
+    # Хвост после последней auto-таблицы в зеркало досылать незачем: мерить нечего.
 
 
-def _fit_table(
-        table: Table,
-        document: Document,
-        measurer: PageMeasurer,
-        probe: Path,
-) -> None:
-    """Подбирает таблице точки разрыва и оставляет её в документе.
+def _fit_table(table: Table, mirror: LayoutMirror, chunks: "_Chunks") -> None:
+    """Подбирает таблице точки разрыва и оставляет её в зеркале.
 
     Каждая попытка добавляет ровно один разрыв, а разрывов в таблице не больше,
     чем строк в её теле, — дальше дробить нечего. Предел попыток поэтому просто
     страховка от зацикливания, а не бюджет.
     """
     for _ in range(len(table.grid.body) + 1):
-        blocks = _render(table, document)
-        split = _overflow_split(table, document, measurer, probe)
+        mirror.append(chunks.of([table]))
+        split = _overflow_split(table, mirror)
         if split is None:
             logger.debug("Таблица %s: подбор закончен, частей %d, точки разрыва %s",
                          table.index, len(table.split_after) + 1, table.split_after)
-            return
+            return  # таблица остаётся в зеркале — она префикс для следующих
 
-        # Разрыв меняет вёрстку самой таблицы, поэтому её надо перерисовать —
-        # но только её: всё, что выше, разрыв не задевает.
-        _remove(document, blocks)
+        mirror.undo()
         table.split_after.append(split)
         logger.debug("Таблица %s: разрыв после строки %d", table.index, split)
 
@@ -85,12 +95,7 @@ def _fit_table(
     )
 
 
-def _overflow_split(
-        table: Table,
-        document: Document,
-        measurer: PageMeasurer,
-        probe: Path,
-) -> int | None:
+def _overflow_split(table: Table, mirror: LayoutMirror) -> int | None:
     """Строка тела, после которой последней части нужен разрыв.
 
     Returns:
@@ -100,13 +105,8 @@ def _overflow_split(
     head_count = len(table.grid.head_rows)
     offset = table.split_after[-1] if table.split_after else 0
 
-    with logged_duration(logger, "Таблица %s: пробник с частью %d сохранён",
-                         table.index, part):
-        document.save(str(probe))
-
     with logged_duration(logger, "Таблица %s: часть %d измерена", table.index, part):
-        row = measurer.first_row_on_later_page(probe, _last_table_index(document),
-                                               head_count)
+        row = mirror.first_row_on_later_page(head_count)
     if row is None:
         return None  # уместилась
 
@@ -123,26 +123,28 @@ def _overflow_split(
     return split
 
 
-def _last_table_index(document: Document) -> int:
-    """Индекс последней таблицы документа — это последняя часть той, что мы мерим."""
-    return len(document.element.body.findall(qn("w:tbl"))) - 1
+class _Chunks:
+    """Куски документа для зеркала: элементы, отрисованные в отдельный файл.
 
+    Элементы приходится рисовать дважды — в документ и в кусок, — потому что
+    перенести готовую разметку между документами python-docx не позволяет:
+    картинки живут отдельными частями пакета и ссылки на них не переедут.
+    Вторая отрисовка стоит O(элемента), измерение по-старому стоило бы
+    O(документа) — размен выгодный.
+    """
 
-def _render(element: ElementBase, document: Document) -> list[BaseOxmlElement]:
-    """Выводит элемент и возвращает блоки, которые он добавил в документ."""
-    body = document.element.body
-    # Список обязателен: lxml создаёт обёртки узлов на лету и уничтожает сразу,
-    # как только на них нет ссылки, а id() уничтоженной переиспользуется под
-    # другой узел. Без живых ссылок сравнение по id() перепутает узлы и снесёт
-    # чужие — например w:sectPr.
-    before = list(body)
-    known = {id(block) for block in before}
-    element.render(document)
-    return [block for block in body if id(block) not in known]
+    def __init__(self, new_document: NewDocument, workdir: Path) -> None:
+        self.__new_document = new_document
+        self.__workdir = workdir
+        self.__seq = 0
 
+    def of(self, elements: Sequence[ElementBase]) -> Path:
+        """Рисует элементы в отдельный файл и возвращает путь к нему."""
+        self.__seq += 1
+        path = self.__workdir / f"chunk_{self.__seq}.docx"
 
-def _remove(document: Document, blocks: list[BaseOxmlElement]) -> None:
-    """Убирает блоки неудачной попытки. Таблица добавляет только их — следов не остаётся."""
-    body = document.element.body
-    for block in blocks:
-        body.remove(block)
+        document = self.__new_document()
+        for element in elements:
+            element.render(document)
+        document.save(str(path))
+        return path
