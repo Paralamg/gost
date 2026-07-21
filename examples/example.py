@@ -5,7 +5,7 @@
 import logging
 from pathlib import Path
 
-from gost import WordBuilder
+from gost import Pt, WordBuilder
 from gost.element_factory import ElementFactory
 from gost.elements.page_break import BreakType
 from gost.index.index_manager import IndexManager
@@ -92,7 +92,7 @@ def main() -> None:
     wb.add_element(factory.create_table(
         _cost_data(50),
         title="Себестоимость с переносом на следующую страницу",
-        split_after=[16],
+        split_after=[15],
     ))
 
     # --- Разрыв: по умолчанию «Следующая страница» ---
@@ -105,6 +105,29 @@ def main() -> None:
     # Разрыв внутри раздела — новой страницы достаточно, отдельный раздел не нужен.
     wb.add_element(factory.create_page_break(BreakType.PAGE))
     wb.add_element(factory.create_text("Этот абзац начинается с новой страницы того же раздела."))
+
+    # --- Настройка стилей: локально и глобально ---
+    wb.add_element(factory.create_head(False, "Настройка стилей", 0))
+
+    # Локально: правим свойства стиля конкретной таблицы — на другие не влияет.
+    local_table = factory.create_table(
+        {"Параметр": ["Шрифт ячеек", "Подпись"], "Значение": ["16 pt", "жирная"]},
+        title="Локальный стиль этой таблицы",
+    )
+    local_table.text_style.font_size = Pt(16)   # только текст ячеек этой таблицы
+    local_table.caption_style.bold = True        # только подпись этой таблицы
+    wb.add_element(local_table)
+
+    # Глобально: меняем дефолт фабрики — влияет на все последующие элементы.
+    factory.style.normal.font_size = Pt(10)
+    factory.style.table_text.font_name = "Courier New"
+    wb.add_element(factory.create_text(
+        "После правки factory.style последующий обычный текст идёт шрифтом 10 pt."
+    ))
+    wb.add_element(factory.create_table(
+        {"Код": ["A1", "B2"], "Описание": ["первый", "второй"]},
+        title="Глобальный стиль: моноширинный шрифт в ячейках",
+    ))
 
     wb.save(OUTPUT)  # об успешном сохранении сообщит сам WordBuilder, на уровне INFO
 
