@@ -11,5 +11,5 @@ class ElementBase(ABC):
 
 
 class NumberedElement(ElementBase, ABC):
-    def __init__(self, number: str) -> None:
-        self.number = number
+    def __init__(self, index: str) -> None:
+        self.index = index

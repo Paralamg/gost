@@ -1,93 +1,113 @@
-from typing import Optional
+import logging
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
-import pandas as pd
 from docx.document import Document
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.shared import Cm, Pt
 
 from gost.elements.element import NumberedElement
-from gost.utils import format_value
+from gost.elements.table_grid import build_grid
+from gost.elements.table_writer import write_caption, write_part
+from gost.timing import logged_duration
+
+logger = logging.getLogger(__name__)
+
+CAPTION = "Таблица {index} – {title}"
+CONTINUATION = "Продолжение таблицы {index}"
+
+AUTO = "auto"
+SplitAfter = Sequence[int] | Literal["auto"] | None
 
 
 class Table(NumberedElement):
     def __init__(
             self,
-            number: str,
-            df: pd.DataFrame,
-            float_format: Optional[str] = ".1f",
-            title: Optional[str] = None,
+            index: str,
+            data: Mapping[str, Sequence[Any]],
+            title: str,
+            *,
             show_header: bool = True,
-            show_index: bool = True,
-            bold_header: bool = False,
-            bold_index: bool = False,
+            show_row_numbers: bool = True,
+            show_column_numbers: bool = True,
+            split_after: SplitAfter = None,
     ) -> None:
-        """Создает таблицу из DataFrame с подписью «Таблица number — title».
-
-        Подпись добавляется только при наличии title, при этом счётчик таблиц увеличивается.
+        """Создает таблицу по ГОСТ 7.32 с подписью «Таблица N – title».
 
         Args:
-            df: Данные для отображения в таблице.
-            float_format: Формат вещественных чисел (например, «.1f»). None — без форматирования.
-            title: Заголовок таблицы. Если None, подпись и счётчик не добавляются.
-            show_header: Добавлять ли строку с именами столбцов.
-            show_index: Добавлять ли столбец с индексом DataFrame.
-            bold_header: Выделять ли заголовки столбцов жирным.
-            bold_index: Выделять ли значения индекса жирным.
+            data: Данные по столбцам: {«Показатель А»: [1.0, 2.5], ...}.
+                Совместимо с df.to_dict("list"). Индексы строк не учитываются.
+                Значения приводятся к строке через str() — числа форматируйте
+                до передачи, иначе 0.1 + 0.2 попадет в документ как
+                «0.30000000000000004».
+            title: Заголовок таблицы. Обязателен: ГОСТ 7.32-2017 (6.6.2) требует
+                наименование у каждой таблицы.
+            show_header: Выводить строку с именами столбцов.
+            show_row_numbers: Добавлять слева столбец «№ п/п» с нумерацией строк.
+            show_column_numbers: Добавлять строку с номерами столбцов 1..N.
+            split_after: Номера строк тела (1-based), после которых таблица
+                разрывается: [20] или range(20, row_count, 20). Каждая часть
+                получает подпись «Продолжение таблицы N» и повтор шапки.
+                «auto» — подобрать точки разрыва по месту на странице; требует
+                Word и extra «autosplit», подбор делает WordBuilder.save().
+                None — таблицу разбивает сам Word, повторяя шапку на каждой
+                странице, но без подписи «Продолжение».
 
-        Returns:
-            Текущий экземпляр WordBuilder для цепочки вызовов.
+        Raises:
+            ValueError: Если заголовок пуст, столбцов нет, они разной длины или
+                split_after выходит за пределы тела таблицы.
         """
-        super().__init__(number)
-        self.df = df
-        self.float_format = float_format
+        super().__init__(index)
+        if not title or not title.strip():
+            raise ValueError("Таблице нужен заголовок")
+        self.grid = build_grid(
+            data,
+            show_header=show_header,
+            show_row_numbers=show_row_numbers,
+            show_column_numbers=show_column_numbers,
+        )
         self.title = title
-        self.show_header = show_header
-        self.show_index = show_index
-        self.bold_header = bold_header
-        self.bold_index = bold_index
+        self.auto_split = split_after == AUTO
+        self.split_after = (
+            [] if self.auto_split
+            else _validate_splits(split_after, len(self.grid.body))
+        )
 
     def render(self, document: Document) -> None:
-        if self.title is not None:
-            caption = document.add_paragraph()
-            caption.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            caption.paragraph_format.first_line_indent = Cm(0)
-            caption.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
-            caption.paragraph_format.space_after = Pt(6)
-            run = caption.add_run(f"Таблица – {self.number}  {self.title}")
-            run.font.size = Pt(14)
+        first, *rest = _split(self.grid.body, self.split_after)
 
-        header_rows = 1 if self.show_header else 0
-        rows = len(self.df) + header_rows
-        index_offset = 1 if self.show_index else 0
-        cols = len(self.df.columns) + index_offset
+        with logged_duration(
+                logger, "Таблица %s выведена: строк %d, столбцов %d, частей %d",
+                self.index, len(self.grid.body), self.grid.width, len(rest) + 1,
+        ):
+            # Подпись есть у каждой таблицы, поэтому она же отделяет её от предыдущей:
+            # два w:tbl подряд Word слил бы в одну таблицу.
+            write_caption(document, CAPTION.format(index=self.index, title=self.title))
 
-        table = document.add_table(rows=rows, cols=cols)
-        table.style = "Table Grid"
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+            # Повтор шапки силами Word — только когда мы не разбиваем таблицу сами,
+            # иначе шапка задвоится на странице продолжения.
+            write_part(document, self.grid, self.grid.head_rows + first, repeat_head=not rest)
 
-        if self.show_header:
-            if self.show_index:
-                table.cell(0, 0).text = ""
-            for j, col_name in enumerate(self.df.columns):
-                cell = table.cell(0, j + index_offset)
-                cell.text = ""
-                run = cell.paragraphs[0].add_run(format_value(col_name, self.float_format))
-                run.bold = self.bold_header
+            for part in rest:
+                write_caption(
+                    document,
+                    CONTINUATION.format(index=self.index),
+                    page_break_before=True,
+                )
+                write_part(document, self.grid, self.grid.head_rows + part)
 
-        for i, (idx, row) in enumerate(self.df.iterrows()):
-            row_idx = i + header_rows
-            if self.show_index:
-                idx_cell = table.cell(row_idx, 0)
-                idx_cell.text = ""
-                run = idx_cell.paragraphs[0].add_run(str(idx))
-                run.bold = self.bold_index
-            for j, val in enumerate(row):
-                table.cell(row_idx, j + index_offset).text = format_value(val, self.float_format)
 
-        for row in table.rows:
-            for cell in row.cells:
-                for para in cell.paragraphs:
-                    para.style = "Table Text"
+def _validate_splits(split_after: Sequence[int] | None, row_count: int) -> list[int]:
+    if not split_after:
+        return []
 
-        document.add_paragraph()
+    splits = sorted(set(split_after))
+    if splits[0] < 1 or splits[-1] >= row_count:
+        raise ValueError(
+            f"split_after: ожидались номера строк 1..{row_count - 1}, "
+            f"получено {list(split_after)}"
+        )
+    return splits
+
+
+def _split(body: list[list[str]], splits: list[int]) -> list[list[list[str]]]:
+    bounds = [0, *splits, len(body)]
+    return [body[start:end] for start, end in zip(bounds, bounds[1:])]

@@ -1,6 +1,7 @@
 from docx.document import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
@@ -8,9 +9,27 @@ from docx.shared import Cm, Pt, RGBColor
 def apply_gost_styles(doc: Document) -> None:
     """Configure GOST 7.32-2001 paragraph and heading styles on *doc* in-place."""
     _apply_section(doc)
+    _apply_language(doc)
     _apply_normal_style(doc)
     _apply_table_text_style(doc)
     _apply_heading_styles(doc)
+
+
+def _apply_language(doc: Document) -> None:
+    """Объявить язык документа русским.
+
+    Шаблон python-docx задаёт в docDefaults язык en-US, и весь текст его
+    наследует — Word проверяет русские слова по английскому словарю и
+    подчёркивает их как ошибочные.
+    """
+    rpr = doc.styles.element.find(
+        f"{qn('w:docDefaults')}/{qn('w:rPrDefault')}/{qn('w:rPr')}"
+    )
+    lang = rpr.find(qn("w:lang"))
+    if lang is None:
+        lang = OxmlElement("w:lang")
+        rpr.append(lang)
+    lang.set(qn("w:val"), "ru-RU")
 
 def _apply_section(doc: Document) -> None:
     # Page margins per ГОСТ 7.32-2001: left ≥ 30mm, right ≥ 10mm, top ≥ 20mm, bottom ≥ 20mm
@@ -35,34 +54,38 @@ def _apply_table_text_style(doc: Document) -> None:
     table_text = doc.styles.add_style("Table Text", WD_STYLE_TYPE.PARAGRAPH)
     table_text.font.name = "Times New Roman"
     table_text.font.size = Pt(12)
-    table_text.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    table_text.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
     table_text.paragraph_format.first_line_indent = Cm(0)
     table_text.paragraph_format.space_before = Pt(0)
     table_text.paragraph_format.space_after = Pt(0)
 
 
 def _apply_heading_styles(doc: Document) -> None:
-    # (style_name, centered, font_size, space_before)
+    # Heading 1 — ненумерованный структурный элемент («Введение», «Основная
+    # часть»), Heading 2..5 — нумерованные разделы и подразделы.
+    # (style_name, bold, centered, all_caps)
     heading_configs = [
-        ("Heading 1", True,  Pt(14), Pt(0)),
-        ("Heading 2", False, Pt(14), Pt(0)),
-        ("Heading 3", False, Pt(14), Pt(0)),
-        ("Heading 4", False, Pt(14), Pt(0)),
+        ("Heading 1", True,  True,  True),
+        ("Heading 2", True,  False, False),
+        ("Heading 3", True,  False, False),
+        ("Heading 4", False, False, False),
+        ("Heading 5", False, False, False),
     ]
-    for style_name, centered, font_size, space_before in heading_configs:
+    for style_name, bold, centered, all_caps in heading_configs:
         s = doc.styles[style_name]
         s.font.name = "Times New Roman"
         _remove_theme_font_overrides(s)
-        s.font.size = font_size
-        s.font.bold = True
+        s.font.size = Pt(14)
+        s.font.bold = bold
         s.font.italic = False
+        s.font.all_caps = all_caps
         s.font.color.rgb = RGBColor(0, 0, 0)
         s.paragraph_format.alignment = (
-            WD_ALIGN_PARAGRAPH.CENTER if centered else WD_ALIGN_PARAGRAPH.LEFT
+            WD_ALIGN_PARAGRAPH.CENTER if centered else WD_ALIGN_PARAGRAPH.JUSTIFY
         )
         s.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
         s.paragraph_format.first_line_indent = Cm(0) if centered else Cm(1.25)
-        s.paragraph_format.space_before = space_before
+        s.paragraph_format.space_before = Pt(0)
         s.paragraph_format.space_after = Pt(0)
         _remove_bottom_border(s)
 
