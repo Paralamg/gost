@@ -10,6 +10,7 @@ from docx.oxml.xmlchemy import BaseOxmlElement
 from docx.table import Table as DocxTable, _Cell, _Row
 
 from gost.elements.table_grid import Grid
+from gost.inline import render_inline
 
 # Дети w:tcPr, которые по схеме идут после w:tcBorders.
 _AFTER_TC_BORDERS = (
@@ -45,7 +46,8 @@ def write_caption(
     if page_break_before:
         fmt.page_break_before = True
 
-    paragraph.add_run(text).font.size = CAPTION_SIZE
+    for run in render_inline(paragraph, text):
+        run.font.size = CAPTION_SIZE
 
 
 def write_part(

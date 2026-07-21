@@ -6,6 +6,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Cm, Pt
 
 from gost.elements.element import NumberedElement
+from gost.inline import render_inline
 from gost.timing import logged_duration
 
 logger = logging.getLogger(__name__)
@@ -47,5 +48,5 @@ class Image(NumberedElement):
         caption.paragraph_format.first_line_indent = Cm(0)
         caption.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
         caption.paragraph_format.space_after = Pt(6)
-        run = caption.add_run(f"Рисунок {self.index} – {self.alt}")
-        run.font.size = Pt(14)
+        for run in render_inline(caption, f"Рисунок {self.index} – {self.alt}"):
+            run.font.size = Pt(14)

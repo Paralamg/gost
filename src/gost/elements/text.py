@@ -1,7 +1,7 @@
 from docx.document import Document
 
 from gost.elements.element import ElementBase
-from gost.utils import render_bold
+from gost.inline import render_inline
 
 
 class Text(ElementBase):
@@ -10,4 +10,4 @@ class Text(ElementBase):
 
     def render(self, document: Document) -> None:
         paragraph = document.add_paragraph()
-        render_bold(paragraph, self.text)
+        render_inline(paragraph, self.text)
