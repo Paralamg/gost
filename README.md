@@ -120,6 +120,49 @@ wb.add_element(factory.create_table(
 Это работает только на Windows с установленным Word, требует `gost-docx[autosplit]` и заметно
 медленнее обычной сборки.
 
+## Стили
+
+Оформление настраивается на двух уровнях: **глобально** (значения по умолчанию для всех
+элементов) и **локально** (переопределение конкретного элемента). По умолчанию действует
+`StyleSheet.gost()` — Times New Roman, полуторный интервал, красная строка 1,25 см и т.д.
+
+Глобальный уровень задаётся при создании фабрики, как и `IndexManager`:
+
+```python
+from gost import WordBuilder, StyleSheet, Pt
+from gost.element_factory import ElementFactory
+
+style = StyleSheet.gost()
+style.normal.font_size = Pt(13)          # обычный текст
+style.table_text.font_name = "Arial"     # текст внутри таблиц
+style.headings[0].font_size = Pt(16)     # заголовок уровня 0 (Heading 1)
+
+factory = ElementFactory(style=style)    # копии стилей стемпятся в каждый элемент
+```
+
+Локально меняется свойство уже созданного элемента — на другие элементы это не влияет.
+У таблицы два стиля: `caption_style` (подпись) и `text_style` (текст ячеек):
+
+```python
+table = factory.create_table(data, title="Смета")
+table.text_style.font_size = Pt(10)      # только ячейки этой таблицы
+table.caption_style.bold = True          # только подпись этой таблицы
+wb.add_element(table)
+
+text = factory.create_text("Абзац")
+text.style.alignment = WD_ALIGN_PARAGRAPH.CENTER   # только этот абзац
+```
+
+Стиль каждого элемента — объект `ParagraphStyle` со свойствами: `font_name`, `font_size`,
+`bold`, `italic`, `all_caps`, `color`, `alignment`, `line_spacing`, `first_line_indent`,
+`space_before`, `space_after`. Свойства `StyleSheet`: `normal`, `headings` (список,
+индекс = уровень заголовка 0–4), `table_caption`, `table_text`, `image_caption`. Типы
+для значений (`Pt`, `Cm`, `RGBColor`, `WD_ALIGN_PARAGRAPH`, `WD_LINE_SPACING`)
+реэкспортируются из `gost` — импортировать из `docx` не нужно.
+
+> Фабрика копирует стили в момент `create_*`, поэтому глобальные правки в `StyleSheet`
+> вносите **до** создания элементов.
+
 ## Примеры
 
 В каталоге `examples/` лежат запускаемые скрипты со всеми стилями:

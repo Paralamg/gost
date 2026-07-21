@@ -2,11 +2,12 @@ import logging
 from pathlib import Path
 
 from docx.document import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.shared import Cm, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm
 
 from gost.elements.element import NumberedElement
 from gost.inline import render_inline
+from gost.styles import ParagraphStyle, apply_paragraph_style
 from gost.timing import logged_duration
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ class Image(NumberedElement):
             index: str,
             path: str,
             alt: str,
+            caption_style: ParagraphStyle,
     ) -> None:
         """
         Создает изображение с подписью «Рисунок number — alt».
@@ -25,6 +27,7 @@ class Image(NumberedElement):
         super().__init__(index)
         self.alt = alt
         self.path = Path(path)
+        self.caption_style = caption_style
 
     def render(self, document: Document) -> None:
         if self.path.exists():
@@ -44,9 +47,5 @@ class Image(NumberedElement):
         picture.paragraph_format.keep_with_next = True
 
         caption = document.add_paragraph()
-        caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        caption.paragraph_format.first_line_indent = Cm(0)
-        caption.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
-        caption.paragraph_format.space_after = Pt(6)
-        for run in render_inline(caption, f"Рисунок {self.index} – {self.alt}"):
-            run.font.size = Pt(14)
+        render_inline(caption, f"Рисунок {self.index} – {self.alt}")
+        apply_paragraph_style(caption, self.caption_style)

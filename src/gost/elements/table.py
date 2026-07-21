@@ -7,6 +7,7 @@ from docx.document import Document
 from gost.elements.element import NumberedElement
 from gost.elements.table_grid import build_grid
 from gost.elements.table_writer import write_caption, write_part
+from gost.styles import ParagraphStyle
 from gost.timing import logged_duration
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,8 @@ class Table(NumberedElement):
             data: Mapping[str, Sequence[Any]],
             title: str,
             *,
+            caption_style: ParagraphStyle,
+            text_style: ParagraphStyle,
             show_header: bool = True,
             show_row_numbers: bool = True,
             show_column_numbers: bool = True,
@@ -40,6 +43,8 @@ class Table(NumberedElement):
                 «0.30000000000000004».
             title: Заголовок таблицы. Обязателен: ГОСТ 7.32-2017 (6.6.2) требует
                 наименование у каждой таблицы.
+            caption_style: Оформление подписи «Таблица N – …».
+            text_style: Оформление текста внутри ячеек таблицы.
             show_header: Выводить строку с именами столбцов.
             show_row_numbers: Добавлять слева столбец «№ п/п» с нумерацией строк.
             show_column_numbers: Добавлять строку с номерами столбцов 1..N.
@@ -65,6 +70,8 @@ class Table(NumberedElement):
             show_column_numbers=show_column_numbers,
         )
         self.title = title
+        self.caption_style = caption_style
+        self.text_style = text_style
         self.auto_split = split_after == AUTO
         self.split_after = (
             [] if self.auto_split
@@ -80,19 +87,27 @@ class Table(NumberedElement):
         ):
             # Подпись есть у каждой таблицы, поэтому она же отделяет её от предыдущей:
             # два w:tbl подряд Word слил бы в одну таблицу.
-            write_caption(document, CAPTION.format(index=self.index, title=self.title))
+            write_caption(
+                document,
+                CAPTION.format(index=self.index, title=self.title),
+                self.caption_style,
+            )
 
             # Повтор шапки силами Word — только когда мы не разбиваем таблицу сами,
             # иначе шапка задвоится на странице продолжения.
-            write_part(document, self.grid, self.grid.head_rows + first, repeat_head=not rest)
+            write_part(
+                document, self.grid, self.grid.head_rows + first,
+                self.text_style, repeat_head=not rest,
+            )
 
             for part in rest:
                 write_caption(
                     document,
                     CONTINUATION.format(index=self.index),
+                    self.caption_style,
                     page_break_before=True,
                 )
-                write_part(document, self.grid, self.grid.head_rows + part)
+                write_part(document, self.grid, self.grid.head_rows + part, self.text_style)
 
 
 def _validate_splits(split_after: Sequence[int] | None, row_count: int) -> list[int]:
