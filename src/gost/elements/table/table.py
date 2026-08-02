@@ -5,8 +5,8 @@ from typing import Any, Literal
 from docx.document import Document
 
 from gost.elements.element import NumberedElement
-from gost.elements.table_grid import build_grid
-from gost.elements.table_writer import write_caption, write_part
+from gost.elements.table.table_grid import build_grid
+from gost.elements.table.table_writer import write_caption, write_part
 from gost.styles import ParagraphStyle
 from gost.timing import logged_duration
 

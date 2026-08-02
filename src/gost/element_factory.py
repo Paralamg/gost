@@ -4,7 +4,7 @@ from typing import Any
 from gost.elements.head import Head
 from gost.elements.image import Image
 from gost.elements.page_break import BreakType, PageBreak
-from gost.elements.table import SplitAfter, Table
+from gost.elements.table.table import SplitAfter, Table
 from gost.elements.text import Text
 from gost.index.index_manager import IndexManager
 from gost.styles import StyleSheet

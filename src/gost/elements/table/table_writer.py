@@ -8,7 +8,7 @@ from docx.shared import Cm, Emu, Length
 from docx.oxml.xmlchemy import BaseOxmlElement
 from docx.table import Table as DocxTable, _Cell, _Row
 
-from gost.elements.table_grid import Grid
+from gost.elements.table.table_grid import Grid
 from gost.inline import render_inline
 from gost.styles import ParagraphStyle, apply_paragraph_style, resolve_table_text_style
 
