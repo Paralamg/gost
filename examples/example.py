@@ -5,7 +5,7 @@
 import logging
 from pathlib import Path
 
-from gost import WordBuilder
+from gost import Pt, WordBuilder
 from gost.element_factory import ElementFactory
 from gost.elements.page_break import BreakType
 from gost.index.index_manager import IndexManager
@@ -34,16 +34,18 @@ def main() -> None:
         "вот ещё немного слов для этого. "
     ))
     wb.add_element(factory.create_text(""))
+    # Инлайн-разметка: жирный/курсив/жирный курсив/подчёркнутый и неразрывный пробел (~).
     wb.add_element(factory.create_text(
-        "Абзац с **жирным текстом** внутри обычного предложения — "
-        "проверка парсера **bold**-разметки."
+        "Инлайн-разметка: **жирный**, *курсив*, _тоже курсив_, "
+        "***жирный курсив***, __подчёркнутый__. "
+        "Неразрывный пробел склеивает «рис.~1» и «10~кг», чтобы их не разорвал перенос строки."
     ))
 
-    # Пример ссылки на изображение
+    # Пример ссылки на изображение. Подпись (alt) тоже понимает инлайн-разметку.
     image = factory.create_image(
         str(ASSETS / "test_image.png"),
-        "Пример подписи к рисунку. Пример подписи к рисунку. Пример подписи к рисунку. "
-        "Пример подписи к рисунку. Пример подписи к рисунку",
+        "Пример подписи к рисунку с *курсивом*. Пример подписи к рисунку. "
+        "Пример подписи к рисунку. Пример подписи к рисунку. Пример подписи к рисунку",
     )
     wb.add_element(factory.create_text(f"На рисунке {image.index}."))
 
@@ -61,10 +63,10 @@ def main() -> None:
         title="Таблица по умолчанию: со столбцом «№ п/п» и строкой номеров столбцов",
     ))
 
-    # --- Таблица без автонумерации ---
+    # --- Таблица без автонумерации; подпись с инлайн-разметкой ---
     wb.add_element(factory.create_table(
         {"Имя": ["Алиса", "Боб", "Вера"], "Возраст": [25, 30, 22]},
-        title="Без «№ п/п» и без строки номеров столбцов",
+        title="Подпись с **жирным** и ***жирным курсивом*** (без «№ п/п» и номеров столбцов)",
         show_row_numbers=False,
         show_column_numbers=False,
     ))
@@ -90,7 +92,7 @@ def main() -> None:
     wb.add_element(factory.create_table(
         _cost_data(50),
         title="Себестоимость с переносом на следующую страницу",
-        split_after=[16],
+        split_after=[15],
     ))
 
     # --- Разрыв: по умолчанию «Следующая страница» ---
@@ -103,6 +105,29 @@ def main() -> None:
     # Разрыв внутри раздела — новой страницы достаточно, отдельный раздел не нужен.
     wb.add_element(factory.create_page_break(BreakType.PAGE))
     wb.add_element(factory.create_text("Этот абзац начинается с новой страницы того же раздела."))
+
+    # --- Настройка стилей: локально и глобально ---
+    wb.add_element(factory.create_head(False, "Настройка стилей", 0))
+
+    # Локально: правим свойства стиля конкретной таблицы — на другие не влияет.
+    local_table = factory.create_table(
+        {"Параметр": ["Шрифт ячеек", "Подпись"], "Значение": ["16 pt", "жирная"]},
+        title="Локальный стиль этой таблицы",
+    )
+    local_table.text_style.font_size = Pt(16)   # только текст ячеек этой таблицы
+    local_table.caption_style.bold = True        # только подпись этой таблицы
+    wb.add_element(local_table)
+
+    # Глобально: меняем дефолт фабрики — влияет на все последующие элементы.
+    factory.style.normal.font_size = Pt(10)
+    factory.style.table_text.font_name = "Courier New"
+    wb.add_element(factory.create_text(
+        "После правки factory.style последующий обычный текст идёт шрифтом 10 pt."
+    ))
+    wb.add_element(factory.create_table(
+        {"Код": ["A1", "B2"], "Описание": ["первый", "второй"]},
+        title="Глобальный стиль: моноширинный шрифт в ячейках",
+    ))
 
     wb.save(OUTPUT)  # об успешном сохранении сообщит сам WordBuilder, на уровне INFO
 

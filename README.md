@@ -33,10 +33,10 @@ wb = WordBuilder()
 factory = ElementFactory()
 
 wb.add_element(factory.create_head(True, "Введение", 1))
-wb.add_element(factory.create_text("Обычный абзац с **жирным** фрагментом."))
+wb.add_element(factory.create_text("Обычный абзац с **жирным** и *курсивным* фрагментом."))
 wb.add_element(factory.create_table(
     {"Имя": ["Алиса", "Боб"], "Возраст": [25, 30]},
-    title="Пример таблицы",
+    title="Пример **таблицы**",
 ))
 
 wb.save(Path("report.docx"))
@@ -48,11 +48,37 @@ wb.save(Path("report.docx"))
 
 | Метод | Что добавляет |
 | --- | --- |
-| `create_text(text)` | Абзац. Фрагменты в `**звёздочках**` становятся жирными. |
+| `create_text(text)` | Абзац. Поддерживает [инлайн-разметку](#инлайн-разметка). |
 | `create_head(use_numbers, text, level)` | Заголовок уровня 0–4. Уровень 0 — по центру, прописными, без номера. |
-| `create_image(path, alt)` | Рисунок с подписью «Рисунок N — alt». |
-| `create_table(data, title, ...)` | Таблица с подписью «Таблица N — title». |
+| `create_image(path, alt)` | Рисунок с подписью «Рисунок N — alt». `alt` поддерживает [инлайн-разметку](#инлайн-разметка). |
+| `create_table(data, title, ...)` | Таблица с подписью «Таблица N — title». `title` поддерживает [инлайн-разметку](#инлайн-разметка). |
 | `create_page_break(break_type)` | Разрыв страницы или раздела. |
+
+### Инлайн-разметка
+
+В тексте абзаца и в подписях таблиц и рисунков (`title`, `alt`) работает облегчённый
+markdown-синтаксис. Он разбирается на лету и превращается в оформленные фрагменты Word.
+
+| Разметка в исходнике | Результат |
+| --- | --- |
+| `**текст**` | **жирный** |
+| `*текст*` или `_текст_` | *курсив* |
+| `***текст***` | ***жирный курсив*** |
+| `__текст__` | подчёркнутый |
+| `~` (одиночная тильда) | неразрывный пробел (`\xa0`) |
+
+```python
+wb.add_element(factory.create_text(
+    "Значение **важно**: до *5* штук, см. рис.~1 и табл.~2."
+))
+wb.add_element(factory.create_table(
+    data, title="Показатели за ***2024*** год",
+))
+```
+
+Ограничения: экранирования нет — любая `~` становится неразрывным пробелом; одиночные `*`/`_`
+без пары остаются как есть, но текст с двумя такими символами (`a * b * c`) может быть ошибочно
+принят за курсив. Зачёркивание (`~~…~~`) не поддерживается — оно конфликтует с `~`.
 
 ### Нумерация
 
@@ -93,6 +119,49 @@ wb.add_element(factory.create_table(
 у Word, на какой странице оказалась каждая строка, и ставит разрыв ровно по краю страницы.
 Это работает только на Windows с установленным Word, требует `gost-docx[autosplit]` и заметно
 медленнее обычной сборки.
+
+## Стили
+
+Оформление настраивается на двух уровнях: **глобально** (значения по умолчанию для всех
+элементов) и **локально** (переопределение конкретного элемента). По умолчанию действует
+`StyleSheet.gost()` — Times New Roman, полуторный интервал, красная строка 1,25 см и т.д.
+
+Глобальный уровень задаётся при создании фабрики, как и `IndexManager`:
+
+```python
+from gost import WordBuilder, StyleSheet, Pt
+from gost.element_factory import ElementFactory
+
+style = StyleSheet.gost()
+style.normal.font_size = Pt(13)          # обычный текст
+style.table_text.font_name = "Arial"     # текст внутри таблиц
+style.headings[0].font_size = Pt(16)     # заголовок уровня 0 (Heading 1)
+
+factory = ElementFactory(style=style)    # копии стилей стемпятся в каждый элемент
+```
+
+Локально меняется свойство уже созданного элемента — на другие элементы это не влияет.
+У таблицы два стиля: `caption_style` (подпись) и `text_style` (текст ячеек):
+
+```python
+table = factory.create_table(data, title="Смета")
+table.text_style.font_size = Pt(10)      # только ячейки этой таблицы
+table.caption_style.bold = True          # только подпись этой таблицы
+wb.add_element(table)
+
+text = factory.create_text("Абзац")
+text.style.alignment = WD_ALIGN_PARAGRAPH.CENTER   # только этот абзац
+```
+
+Стиль каждого элемента — объект `ParagraphStyle` со свойствами: `font_name`, `font_size`,
+`bold`, `italic`, `all_caps`, `color`, `alignment`, `line_spacing`, `first_line_indent`,
+`space_before`, `space_after`. Свойства `StyleSheet`: `normal`, `headings` (список,
+индекс = уровень заголовка 0–4), `table_caption`, `table_text`, `image_caption`. Типы
+для значений (`Pt`, `Cm`, `RGBColor`, `WD_ALIGN_PARAGRAPH`, `WD_LINE_SPACING`)
+реэкспортируются из `gost` — импортировать из `docx` не нужно.
+
+> Фабрика копирует стили в момент `create_*`, поэтому глобальные правки в `StyleSheet`
+> вносите **до** создания элементов.
 
 ## Примеры
 

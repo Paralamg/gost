@@ -2,14 +2,15 @@
 
 from docx.document import Document
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Emu, Length, Pt
+from docx.shared import Cm, Emu, Length
 from docx.oxml.xmlchemy import BaseOxmlElement
 from docx.table import Table as DocxTable, _Cell, _Row
 
 from gost.elements.table_grid import Grid
+from gost.inline import render_inline
+from gost.styles import ParagraphStyle, apply_paragraph_style, resolve_table_text_style
 
 # Дети w:tcPr, которые по схеме идут после w:tcBorders.
 _AFTER_TC_BORDERS = (
@@ -18,14 +19,13 @@ _AFTER_TC_BORDERS = (
 )
 
 TABLE_STYLE = "Table Grid"
-CELL_STYLE = "Table Text"
-CAPTION_SIZE = Pt(14)
 ROW_NUMBER_WIDTH = Cm(1.2)
 
 
 def write_caption(
         document: Document,
         text: str,
+        style: ParagraphStyle,
         *,
         page_break_before: bool = False,
 ) -> None:
@@ -33,25 +33,24 @@ def write_caption(
 
     Подпись первой части и подписи продолжений оформляются одинаково: ГОСТ 7.32-2017
     (6.6.3) требует писать слева и «Таблица N – ...», и «Продолжение таблицы N».
+    Шрифт и абзац берутся из *style*; keep_with_next и page_break_before —
+    структурные, в пользовательский стиль не входят.
     """
     paragraph = document.add_paragraph()
-    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    render_inline(paragraph, text)
+    apply_paragraph_style(paragraph, style)
 
     fmt = paragraph.paragraph_format
-    fmt.first_line_indent = Cm(0)
-    fmt.line_spacing_rule = WD_LINE_SPACING.SINGLE
-    fmt.space_after = Pt(6)
     fmt.keep_with_next = True
     if page_break_before:
         fmt.page_break_before = True
-
-    paragraph.add_run(text).font.size = CAPTION_SIZE
 
 
 def write_part(
         document: Document,
         grid: Grid,
         rows: list[list[str]],
+        text_style: ParagraphStyle,
         *,
         repeat_head: bool = False,
 ) -> None:
@@ -60,6 +59,7 @@ def write_part(
     Args:
         grid: Сетка целиком — нужна для ширины и раскладки столбцов.
         rows: Строки этой части, включая её шапку.
+        text_style: Оформление текста ячеек.
         repeat_head: Помечать ли шапку как повторяемую на каждой странице
             («w:tblHeader»). Только для неразрывной таблицы: при ручном
             разбиении шапка пишется в каждую часть явно.
@@ -71,10 +71,12 @@ def write_part(
     widths = _column_widths(document, grid)
     _fix_layout(table, widths)
 
-    # Идентификатор стиля резолвится один раз на таблицу: paragraph.style = "Table Text"
-    # ищет стиль по имени и перебирает все стили документа на каждой ячейке — на
-    # таблице в сотню строк это 85% времени сборки.
-    style_id = document.styles[CELL_STYLE].style_id
+    # Идентификатор стиля резолвится один раз на таблицу: назначение стиля по
+    # имени перебирает все стили документа на каждой ячейке — на таблице в сотню
+    # строк это 85% времени сборки. resolve_table_text_style регистрирует
+    # отдельный именованный стиль под конфигурацию text_style (или переиспользует
+    # базовый «Table Text» для дефолта ГОСТ).
+    style_id = resolve_table_text_style(document, text_style)
 
     for row, values in zip(table.rows, rows):
         _forbid_split(row)
