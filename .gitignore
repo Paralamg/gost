@@ -10,6 +10,9 @@ mlruns/
 ._*
 .DS_Store
 
+# Временные файлы открытых документов Word
+~$*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
