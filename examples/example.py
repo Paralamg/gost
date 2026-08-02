@@ -95,6 +95,47 @@ def main() -> None:
         split_after=[15],
     ))
 
+    # --- Формулы ---
+    wb.add_element(factory.create_head(False, "Формулы", 0))
+
+    # Нумерованная формула с расшифровкой обозначений: формула по центру,
+    # номер у правого поля, ниже блок «где ...».
+    kinetic = factory.create_formula(
+        r"E = \frac{mv^2}{2}",
+        where={"m": "масса тела, кг", "v": "скорость тела, м/с"},
+    )
+    wb.add_element(factory.create_text(
+        f"Кинетическая энергия вычисляется по формуле ({kinetic.index})."
+    ))
+    wb.add_element(kinetic)
+
+    # Формула без ссылок в тексте — ГОСТ разрешает не нумеровать.
+    wb.add_element(factory.create_text("Ненумерованная формула идёт просто по центру:"))
+    wb.add_element(factory.create_formula(r"a^2 + b^2 = c^2", numbered=False))
+
+    # Тяжёлая формула: вложенные радикал, дробь и сумма с пределами — проверка
+    # того, что скобки и знак корня растягиваются по высоте содержимого.
+    wb.add_element(factory.create_text(
+        "Среднеквадратическое отклонение — вложенные радикал, дробь и сумма:"
+    ))
+    wb.add_element(factory.create_formula(
+        r"\sigma = \sqrt{\frac{\sum_{i=1}^{n}(x_i - \bar{x})^2}{n - 1}}",
+        # Ключи блока «где» — обычный текст с инлайн-разметкой, не LaTeX.
+        where={"*x*": "значение отдельного измерения", "n": "объём выборки"},
+    ))
+
+    # Матрица, система и кириллица в индексах.
+    wb.add_element(factory.create_text("Матрица, система уравнений и индексы кириллицей:"))
+    wb.add_element(factory.create_formula(
+        r"A = \begin{pmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \end{pmatrix}"
+    ))
+    wb.add_element(factory.create_formula(
+        r"f(x) = \begin{cases} x, & x > 0 \\ 0, & x \leq 0 \end{cases}"
+    ))
+    wb.add_element(factory.create_formula(
+        r"K_{\text{сум}} = \frac{P_{вх}}{P_{вых}} \cdot 100\%"
+    ))
+
     # --- Разрыв: по умолчанию «Следующая страница» ---
     # Разрыв раздела: новый раздел начинается с новой страницы и наследует
     # поля предыдущего.

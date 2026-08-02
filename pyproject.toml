@@ -24,11 +24,17 @@ classifiers = [
 dependencies = [
     "python-docx>=1.2.0",
     "tqdm>=4.68.4",
+    # Разбор LaTeX в MathML. Дальше MathML в OMML переводит свой конвертер
+    # (gost.elements.formula.omml).
+    "latex2mathml>=3.81.0",
 ]
 
 [project.optional-dependencies]
 # split_after="auto": подбор точек разрыва по вёрстке реального Word.
 autosplit = ["pywin32>=306; sys_platform == 'win32'"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 [project.urls]
 Homepage = "https://github.com/Paralamg/gost"
