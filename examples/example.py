@@ -96,6 +96,7 @@ def main() -> None:
     ))
 
     # --- Формулы ---
+    wb.add_element(factory.create_page_break())
     wb.add_element(factory.create_head(False, "Формулы", 0))
 
     # Нумерованная формула с расшифровкой обозначений: формула по центру,
