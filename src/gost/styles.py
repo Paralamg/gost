@@ -54,6 +54,8 @@ class StyleSheet:
     table_caption: ParagraphStyle
     table_text: ParagraphStyle
     image_caption: ParagraphStyle
+    formula: ParagraphStyle
+    formula_note: ParagraphStyle
 
     @classmethod
     def gost(cls) -> "StyleSheet":
@@ -89,6 +91,24 @@ class StyleSheet:
                 first_line_indent=Cm(0),
                 space_after=Pt(6),
             ),
+            # Выше и ниже формулы ГОСТ требует свободную строку — это отбивки,
+            # а не пустые абзацы. Выравнивание задаёт сам элемент: у нумерованной
+            # формулы центр и правый край держатся на позициях табуляции.
+            formula=ParagraphStyle(
+                font_size=Pt(14),
+                line_spacing=WD_LINE_SPACING.SINGLE,
+                first_line_indent=Cm(0),
+                space_before=Pt(14),
+                space_after=Pt(14),
+            ),
+            formula_note=ParagraphStyle(
+                font_size=Pt(14),
+                alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+                line_spacing=WD_LINE_SPACING.ONE_POINT_FIVE,
+                first_line_indent=Cm(0),
+                space_before=Pt(0),
+                space_after=Pt(0),
+            ),
         )
 
     def copy(self) -> "StyleSheet":
@@ -98,6 +118,8 @@ class StyleSheet:
             table_caption=self.table_caption.copy(),
             table_text=self.table_text.copy(),
             image_caption=self.image_caption.copy(),
+            formula=self.formula.copy(),
+            formula_note=self.formula_note.copy(),
         )
 
 

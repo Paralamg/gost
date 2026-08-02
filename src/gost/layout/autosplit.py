@@ -21,8 +21,8 @@ from pathlib import Path
 
 from docx.document import Document
 
-from gost.elements.element import ElementBase
-from gost.elements.table import Table
+from gost.elements import ElementBase
+from gost.elements import Table
 from gost.layout.measurer import LayoutMirror
 from gost.progress import tracked
 from gost.timing import logged_duration

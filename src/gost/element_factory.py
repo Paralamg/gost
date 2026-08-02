@@ -1,10 +1,11 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from gost.elements.formula import Formula
 from gost.elements.head import Head
 from gost.elements.image import Image
 from gost.elements.page_break import BreakType, PageBreak
-from gost.elements.table import SplitAfter, Table
+from gost.elements.table.table import SplitAfter, Table
 from gost.elements.text import Text
 from gost.index.index_manager import IndexManager
 from gost.styles import StyleSheet
@@ -58,4 +59,22 @@ class ElementFactory:
             show_row_numbers=show_row_numbers,
             show_column_numbers=show_column_numbers,
             split_after=split_after,
+        )
+
+    def create_formula(
+            self,
+            latex: str,
+            *,
+            where: Mapping[str, str] | None = None,
+            numbered: bool = True,
+    ) -> Formula:
+        # Ненумерованная формула не тратит счётчик: ГОСТ разрешает не нумеровать
+        # формулы, на которые нет ссылок в тексте.
+        index = self.__index_manager.get_formula_index() if numbered else ""
+        return Formula(
+            index,
+            latex,
+            where=where,
+            formula_style=self.style.formula.copy(),
+            note_style=self.style.formula_note.copy(),
         )

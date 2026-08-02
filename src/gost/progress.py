@@ -8,7 +8,7 @@ from tqdm import tqdm
 T = TypeVar("T")
 
 
-def tracked(elements: Sequence[T], description: str) -> Iterator[T]:
+def tracked(elements: Sequence[T], description: str):
     """Перебирает элементы, показывая шкалу прогресса.
 
     Шкала гаснет сама, когда вывод идёт не в терминал: в файле лога или в CI

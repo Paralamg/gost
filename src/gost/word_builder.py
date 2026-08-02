@@ -7,7 +7,7 @@ from docx import Document as new_document
 from docx.document import Document
 
 from .elements.element import ElementBase
-from .elements.table import Table
+from .elements import Table
 from .layout.autosplit import render_with_auto_splits
 from .layout.measurer import LayoutMirror, WordMirror
 from .progress import tracked
