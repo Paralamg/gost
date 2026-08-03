@@ -128,19 +128,26 @@ class StyleSheet:
         )
 
 
-# (bold, centered, all_caps) по логическим уровням заголовков 0..4.
+# (bold, centered, all_caps, spacing) по логическим уровням заголовков 0..4.
 # Heading 1 — ненумерованный структурный элемент («Введение»), по центру,
 # прописными; Heading 2..5 — нумерованные разделы и подразделы.
+# spacing — отбивка сверху и снизу: разделы верхних уровней отделяются от
+# текста, глубокие подразделы идут вплотную.
 _HEADING_CONFIGS = [
-    (True,  True,  True),
-    (True,  False, False),
-    (True,  False, False),
-    (False, False, False),
-    (False, False, False),
+    (True,  True,  True,  Pt(6)),
+    (True,  False, False, Pt(6)),
+    (True,  False, False, Pt(6)),
+    (False, False, False, Pt(0)),
+    (False, False, False, Pt(0)),
 ]
 
 
-def _gost_heading(bold: bool, centered: bool, all_caps: bool) -> ParagraphStyle:
+def _gost_heading(
+        bold: bool,
+        centered: bool,
+        all_caps: bool,
+        spacing: Length,
+) -> ParagraphStyle:
     return ParagraphStyle(
         font_size=Pt(14),
         bold=bold,
@@ -150,8 +157,8 @@ def _gost_heading(bold: bool, centered: bool, all_caps: bool) -> ParagraphStyle:
         alignment=WD_ALIGN_PARAGRAPH.CENTER if centered else WD_ALIGN_PARAGRAPH.JUSTIFY,
         line_spacing=WD_LINE_SPACING.ONE_POINT_FIVE,
         first_line_indent=Cm(0) if centered else Cm(1.25),
-        space_before=Pt(0),
-        space_after=Pt(0),
+        space_before=spacing,
+        space_after=spacing,
     )
 
 
