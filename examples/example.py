@@ -16,11 +16,11 @@ def main() -> None:
     factory = ElementFactory(IndexManager(character="А", index_type=IndexType.CONTINUOUS))
 
     # --- Заголовки ---
-    wb.add_element(factory.create_head(False, "Основная часть (уровень 0, Heading 1, по центру, UPPER, без номера)", 0))
-    wb.add_element(factory.create_head(True, "Заголовок первого уровня (уровень 1, Heading 2, с номером)", 1))
-    wb.add_element(factory.create_head(True, "Заголовок второго уровня (уровень 2, Heading 3, с номером)", 2))
-    wb.add_element(factory.create_head(True, "Заголовок третьего уровня (уровень 3, Heading 4, с номером)", 3))
-    wb.add_element(factory.create_head(True, "Заголовок четвертого уровня (уровень 4, Heading 5, с номером)", 4))
+    wb.add_element(factory.create_head("Основная часть (уровень 0, Heading 1, по центру, UPPER, без номера)", False, 0))
+    wb.add_element(factory.create_head("Заголовок первого уровня (уровень 1, Heading 2, с номером)", True, 1))
+    wb.add_element(factory.create_head("Заголовок второго уровня (уровень 2, Heading 3, с номером)", True, 2))
+    wb.add_element(factory.create_head("Заголовок третьего уровня (уровень 3, Heading 4, с номером)", True, 3))
+    wb.add_element(factory.create_head("Заголовок четвертого уровня (уровень 4, Heading 5, с номером)", True, 4))
 
     # --- Обычный текст ---
     wb.add_element(factory.create_text(
@@ -98,7 +98,7 @@ def main() -> None:
 
     # --- Формулы ---
     wb.add_element(factory.create_page_break())
-    wb.add_element(factory.create_head(False, "Формулы", 0))
+    wb.add_element(factory.create_head("Формулы", False, 0))
 
     # Нумерованная формула с расшифровкой обозначений: формула по центру,
     # номер у правого поля, ниже блок «где ...».
@@ -150,7 +150,7 @@ def main() -> None:
     wb.add_element(factory.create_text("Этот абзац начинается с новой страницы того же раздела."))
 
     # --- Настройка стилей: локально и глобально ---
-    wb.add_element(factory.create_head(False, "Настройка стилей", 0))
+    wb.add_element(factory.create_head("Настройка стилей", False, 0))
 
     # Локально: правим свойства стиля конкретной таблицы — на другие не влияет.
     local_table = factory.create_table(

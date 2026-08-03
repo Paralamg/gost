@@ -27,9 +27,9 @@ class ElementFactory:
     def create_text(self, text: str) -> Text:
         return Text(text, self.style.normal.copy())
 
-    def create_head(self, use_numbers: bool, text: str, level: int) -> Head:
+    def create_head(self, text: str, use_numbers: bool, level: int) -> Head:
         index = self.__index_manager.get_head_index(level)
-        return Head(index, use_numbers, text, level, self.style.headings[level].copy())
+        return Head(index, text, use_numbers, level, self.style.headings[level].copy())
 
     def create_page_break(self, break_type: BreakType = BreakType.NEXT_PAGE) -> PageBreak:
         return PageBreak(break_type)

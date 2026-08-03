@@ -146,9 +146,9 @@ def test_factory_copies_styles(factory):
 
 def test_chapter_relative_numbering():
     factory = ElementFactory(IndexManager(index_type=IndexType.CHAPTER_RELATIVE))
-    factory.create_head(True, "Раздел", 1)
+    factory.create_head("Раздел", True, 1)
     assert factory.create_formula(r"x").index == "1.1"
-    factory.create_head(True, "Второй", 1)
+    factory.create_head("Второй", True, 1)
     assert factory.create_formula(r"y").index == "2.1"
 
 

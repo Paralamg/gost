@@ -18,8 +18,8 @@ class Head(NumberedElement):
     def __init__(
             self,
             index: str,
-            use_number: bool,
             text: str,
+            use_number: bool,
             level: int,
             style: ParagraphStyle,
     ) -> None:
