@@ -83,14 +83,16 @@ def test_unnumbered_formula_has_no_number(document):
 
 
 def test_where_block_format(document):
+    """Обозначения встают в колонку: «где» отбивается табом, следующие строки
+    начинаются с него же и попадают на ту же позицию табуляции."""
     make(index="1", where={"m": "масса тела, кг", "v": "скорость, м/с"}).render(document)
     notes = [p.text for p in document.paragraphs[1:]]
-    assert notes == ["где m – масса тела, кг;", "v – скорость, м/с."]
+    assert notes == ["где \tm – масса тела, кг;", "\tv – скорость, м/с."]
 
 
 def test_single_where_entry_ends_with_period(document):
     make(where={"m": "масса, кг"}).render(document)
-    assert document.paragraphs[1].text == "где m – масса, кг."
+    assert document.paragraphs[1].text == "где \tm – масса, кг."
 
 
 def test_where_keeps_explanation_with_formula(document):
@@ -146,9 +148,9 @@ def test_factory_copies_styles(factory):
 
 def test_chapter_relative_numbering():
     factory = ElementFactory(IndexManager(index_type=IndexType.CHAPTER_RELATIVE))
-    factory.create_head(True, "Раздел", 1)
+    factory.create_head("Раздел", True, 1)
     assert factory.create_formula(r"x").index == "1.1"
-    factory.create_head(True, "Второй", 1)
+    factory.create_head("Второй", True, 1)
     assert factory.create_formula(r"y").index == "2.1"
 
 

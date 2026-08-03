@@ -1,3 +1,5 @@
+"""Элемент «таблица»: подпись, шапка и разбиение на части."""
+
 import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
@@ -16,10 +18,21 @@ CAPTION = "Таблица {index} – {title}"
 CONTINUATION = "Продолжение таблицы {index}"
 
 AUTO = "auto"
+
+# Точки разрыва таблицы: номера строк, «auto» (подобрать измерением) или None
+# (не разбивать самим — оставить это Word).
 SplitAfter = Sequence[int] | Literal["auto"] | None
 
 
 class Table(NumberedElement):
+    """Таблица по ГОСТ 7.32-2017 с подписью «Таблица N – title».
+
+    Длинная таблица разбивается на части: каждая выводится отдельной таблицей
+    Word со своей шапкой и подписью «Продолжение таблицы N». Точки разрыва
+    задаются номерами строк либо подбираются измерением вёрстки — см.
+    *split_after*.
+    """
+
     def __init__(
             self,
             index: str,
@@ -33,9 +46,10 @@ class Table(NumberedElement):
             show_column_numbers: bool = True,
             split_after: SplitAfter = None,
     ) -> None:
-        """Создает таблицу по ГОСТ 7.32 с подписью «Таблица N – title».
+        """Раскладывает данные в сетку и проверяет их — до вывода в документ.
 
         Args:
+            index: Номер таблицы.
             data: Данные по столбцам: {«Показатель А»: [1.0, 2.5], ...}.
                 Совместимо с df.to_dict("list"). Индексы строк не учитываются.
                 Значения приводятся к строке через str() — числа форматируйте
@@ -111,6 +125,12 @@ class Table(NumberedElement):
 
 
 def _validate_splits(split_after: Sequence[int] | None, row_count: int) -> list[int]:
+    """Приводит точки разрыва к возрастающему списку без повторов.
+
+    Raises:
+        ValueError: Если номер строки выходит за пределы тела таблицы. Разрыв
+            после последней строки бессмысленен — часть за ним пуста.
+    """
     if not split_after:
         return []
 
@@ -124,5 +144,6 @@ def _validate_splits(split_after: Sequence[int] | None, row_count: int) -> list[
 
 
 def _split(body: list[list[str]], splits: list[int]) -> list[list[list[str]]]:
+    """Режет тело таблицы на части по точкам разрыва. Без них — одна часть."""
     bounds = [0, *splits, len(body)]
     return [body[start:end] for start, end in zip(bounds, bounds[1:])]

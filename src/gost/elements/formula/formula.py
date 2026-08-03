@@ -1,3 +1,5 @@
+"""Элемент «формула»: выключная строка с номером и блоком «где ...»."""
+
 from collections.abc import Mapping
 
 from docx.document import Document
@@ -92,6 +94,7 @@ class Formula(NumberedElement):
         return para
 
     def __numbered_row(self, math):
+        """Переносит формулу в строку m:eqArr и приписывает к ней номер."""
         row = OxmlElement("m:e")
         # Формула переезжает из корня в строку — там её и ждёт m:eqArr.
         for node in list(math):
@@ -107,16 +110,23 @@ class Formula(NumberedElement):
         return equations
 
     def __render_where(self, document: Document) -> None:
+        """Выводит расшифровку обозначений: «где m – масса, кг;».
+
+        Расшифровка — одно предложение, поэтому строки разделяются точкой с
+        запятой, а последняя заканчивается точкой. Слово «где» стоит только у
+        первой, но табуляция есть у всех: так обозначения встают в колонку.
+        """
         items = list(self.where.items())
         for position, (symbol, description) in enumerate(items):
             prefix = WHERE if position == 0 else ""
             ending = "." if position == len(items) - 1 else ";"
             paragraph = document.add_paragraph()
-            render_inline(paragraph, f"{prefix}{symbol} {DASH} {description}{ending}")
+            render_inline(paragraph, f"{prefix}\t{symbol} {DASH} {description}{ending}")
             apply_paragraph_style(paragraph, self.note_style)
 
 
 def _run(text: str, *, literal: bool = False):
+    """Текстовый фрагмент формулы. literal — обычный текст, без курсива формул."""
     node = OxmlElement("m:r")
     if literal:
         properties = OxmlElement("m:rPr")
@@ -143,6 +153,7 @@ def _number(index: str):
 
 
 def _val(tag: str, value: str):
+    """Элемент-настройка OMML: тег со значением в атрибуте m:val."""
     node = OxmlElement(tag)
     node.set(qn("m:val"), value)
     return node

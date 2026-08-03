@@ -1,3 +1,5 @@
+"""Элемент «разрыв»: страницы, колонки или раздела."""
+
 from enum import Enum, auto
 
 from docx.document import Document

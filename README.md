@@ -1,11 +1,45 @@
 # gost-docx
 
-Генерация документов Word (`.docx`), оформленных по ГОСТ 7.32-2017: Times New Roman 14 pt,
-полуторный интервал, красная строка 1,25 см, сквозная нумерация заголовков, рисунков и таблиц,
-подписи «Рисунок N — …» и «Таблица N — …», перенос длинных таблиц с надписью «Продолжение таблицы N».
+[![PyPI](https://img.shields.io/pypi/v/gost-docx.svg)](https://pypi.org/project/gost-docx/)
+[![Python](https://img.shields.io/pypi/pyversions/gost-docx.svg)](https://pypi.org/project/gost-docx/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-Документ собирается из элементов, а нумерация проставляется автоматически — вручную считать
-номера рисунков и таблиц не нужно.
+Генерация документов Word (`.docx`), оформленных по ГОСТ 7.32-2017.
+
+<!-- TODO: скриншот страницы из examples/example.docx — рисунок с подписью, формула с номером,
+     перенос таблицы с «Продолжением». Заменить строку ниже на ![Пример](docs/img/example.png) -->
+
+## Зачем
+
+`python-docx` даёт абзацы и таблицы, но ничего не знает про ГОСТ. Всё остальное приходится
+делать руками:
+
+| Руками на `python-docx` | Здесь |
+| --- | --- |
+| Считать номера рисунков и таблиц и править их после каждой вставки | Нумерация проставляется сама |
+| Верстать перенос длинной таблицы и дописывать «Продолжение таблицы N» | `split_after=[16]` или `"auto"` |
+| Вставлять формулы картинками — их не отредактировать и они мылят при печати | Настоящий объект «Уравнение» из LaTeX |
+| Проставлять шрифт, интервал и отступ каждому абзацу | `StyleSheet.gost()` по умолчанию |
+
+Документ собирается из элементов, а оформление и нумерация — забота библиотеки.
+
+> **Статус:** ранняя версия (alpha). Библиотека рабочая, но публичный API ещё может
+> меняться между минорными версиями.
+
+## Содержание
+
+- [Установка](#установка)
+- [Быстрый старт](#быстрый-старт)
+- [Элементы документа](#элементы-документа)
+  - [Инлайн-разметка](#инлайн-разметка)
+  - [Нумерация](#нумерация)
+  - [Таблицы](#таблицы)
+  - [Формулы](#формулы)
+- [Стили](#стили)
+- [Ограничения](#ограничения)
+- [Примеры](#примеры)
+- [Разработка](#разработка)
+- [Лицензия](#лицензия)
 
 ## Установка
 
@@ -26,13 +60,12 @@ pip install "gost-docx[autosplit]"
 ```python
 from pathlib import Path
 
-from gost import WordBuilder
-from gost.element_factory import ElementFactory
+from gost import ElementFactory, WordBuilder
 
 wb = WordBuilder()
 factory = ElementFactory()
 
-wb.add_element(factory.create_head(True, "Введение", 1))
+wb.add_element(factory.create_head("Введение", False, 0))
 wb.add_element(factory.create_text("Обычный абзац с **жирным** и *курсивным* фрагментом."))
 wb.add_element(factory.create_table(
     {"Имя": ["Алиса", "Боб"], "Возраст": [25, 30]},
@@ -49,9 +82,9 @@ wb.save(Path("report.docx"))
 | Метод | Что добавляет |
 | --- | --- |
 | `create_text(text)` | Абзац. Поддерживает [инлайн-разметку](#инлайн-разметка). |
-| `create_head(use_numbers, text, level)` | Заголовок уровня 0–4. Уровень 0 — по центру, прописными, без номера. |
-| `create_image(path, alt)` | Рисунок с подписью «Рисунок N — alt». `alt` поддерживает [инлайн-разметку](#инлайн-разметка). |
-| `create_table(data, title, ...)` | Таблица с подписью «Таблица N — title». `title` поддерживает [инлайн-разметку](#инлайн-разметка). |
+| `create_head(text, use_numbers, level)` | Заголовок уровня 0–4. Уровень 0 — по центру, прописными, без номера. |
+| `create_image(path, alt)` | Рисунок с подписью «Рисунок N – alt». `alt` поддерживает [инлайн-разметку](#инлайн-разметка). |
+| `create_table(data, title, ...)` | Таблица с подписью «Таблица N – title». `title` поддерживает [инлайн-разметку](#инлайн-разметка). |
 | `create_formula(latex, ...)` | [Формула](#формулы) на LaTeX с номером у правого края. |
 | `create_page_break(break_type)` | Разрыв страницы или раздела. |
 
@@ -77,18 +110,12 @@ wb.add_element(factory.create_table(
 ))
 ```
 
-Ограничения: экранирования нет — любая `~` становится неразрывным пробелом; одиночные `*`/`_`
-без пары остаются как есть, но текст с двумя такими символами (`a * b * c`) может быть ошибочно
-принят за курсив. Зачёркивание (`~~…~~`) не поддерживается — оно конфликтует с `~`.
-
 ### Нумерация
 
 Режим нумерации задаётся при создании `IndexManager` и передаётся в фабрику:
 
 ```python
-from gost.element_factory import ElementFactory
-from gost.index.index_manager import IndexManager
-from gost.index.index_type import IndexType
+from gost import ElementFactory, IndexManager, IndexType
 
 # Сквозная нумерация по всему документу: Таблица 1, Таблица 2, ...
 factory = ElementFactory(IndexManager(index_type=IndexType.CONTINUOUS))
@@ -112,9 +139,6 @@ wb.add_element(factory.create_table(
     split_after=[16],            # после каких строк переносить таблицу на новую страницу
 ))
 ```
-
-Значения приводятся к строке через `str()`, поэтому числа форматируйте заранее:
-`[f"{v:.2f}" for v in values]`.
 
 `split_after="auto"` подбирает точки разрыва измерением: `save()` рендерит документ, спрашивает
 у Word, на какой странице оказалась каждая строка, и ставит разрыв ровно по краю страницы.
@@ -161,10 +185,6 @@ wb.add_element(factory.create_formula(r"a^2 + b^2 = c^2", numbered=False))
 (`\left(...\right)`), акценты (`\vec`, `\hat`, `\overline`), скобки-обхваты
 (`\underbrace`), греческие буквы и кириллица в индексах (`P_{вх}`).
 
-Формулы отрисовываются шрифтом Cambria Math — это единственный шрифт из поставки
-Office с таблицей OpenType MATH, только с ним корректно растягиваются скобки,
-радикалы и знаки интеграла. Он отличается от Times New Roman основного текста.
-
 ## Стили
 
 Оформление настраивается на двух уровнях: **глобально** (значения по умолчанию для всех
@@ -174,8 +194,7 @@ Office с таблицей OpenType MATH, только с ним коррект�
 Глобальный уровень задаётся при создании фабрики, как и `IndexManager`:
 
 ```python
-from gost import WordBuilder, StyleSheet, Pt
-from gost.element_factory import ElementFactory
+from gost import ElementFactory, Pt, StyleSheet, WordBuilder
 
 style = StyleSheet.gost()
 style.normal.font_size = Pt(13)          # обычный текст
@@ -189,6 +208,8 @@ factory = ElementFactory(style=style)    # копии стилей стемпя�
 У таблицы два стиля: `caption_style` (подпись) и `text_style` (текст ячеек):
 
 ```python
+from gost import WD_ALIGN_PARAGRAPH, Pt
+
 table = factory.create_table(data, title="Смета")
 table.text_style.font_size = Pt(10)      # только ячейки этой таблицы
 table.caption_style.bold = True          # только подпись этой таблицы
@@ -209,6 +230,22 @@ text.style.alignment = WD_ALIGN_PARAGRAPH.CENTER   # только этот аб�
 > Фабрика копирует стили в момент `create_*`, поэтому глобальные правки в `StyleSheet`
 > вносите **до** создания элементов.
 
+## Ограничения
+
+Честный список того, что стоит знать заранее:
+
+- **Значения таблиц приводятся к строке через `str()`** — числа форматируйте сами:
+  `[f"{v:.2f}" for v in values]`.
+- **В инлайн-разметке нет экранирования.** Любая `~` становится неразрывным пробелом;
+  одиночные `*`/`_` без пары остаются как есть, но текст с двумя такими символами
+  (`a * b * c`) может быть ошибочно принят за курсив. Зачёркивание (`~~…~~`)
+  не поддерживается — конфликтует с `~`.
+- **`split_after="auto"` работает только на Windows с установленным Word** и заметно
+  медленнее обычной сборки. На других платформах указывайте точки разрыва списком.
+- **Формулы отрисовываются шрифтом Cambria Math** — это единственный шрифт из поставки
+  Office с таблицей OpenType MATH, только с ним корректно растягиваются скобки, радикалы
+  и знаки интеграла. Он отличается от Times New Roman основного текста.
+
 ## Примеры
 
 В каталоге `examples/` лежат запускаемые скрипты со всеми стилями:
@@ -220,93 +257,7 @@ python examples/autosplit_example.py  # split_after="auto" (нужен Windows +
 
 ## Разработка
 
-Проект использует [uv](https://docs.astral.sh/uv/).
-
-```bash
-git clone git@github.com:Paralamg/gost.git
-cd gost
-uv sync
-uv run python examples/example.py
-uv run pytest
-```
-
-Тесты конвертера формул сверяются с эталоном Microsoft — `MML2OMML.XSL` из поставки
-Office. Сам файл проприетарный, в репозиторий не входит и библиотекой не используется;
-сверка нужна только при разработке и пропускается, если Office не установлен. Путь
-задаётся переменной `GOST_MML2OMML_XSL`.
-
-## Публикация на PyPI
-
-Сборка выполняется бэкендом `uv_build`, публикация — командой `uv publish`.
-
-### 1. Подготовка
-
-Перед выпуском поднимите версию в `pyproject.toml` (поле `version`) — PyPI не разрешает
-повторно загрузить уже опубликованную версию, даже после удаления файла.
-
-Получите API-токен: [pypi.org/manage/account/token](https://pypi.org/manage/account/token/)
-(и отдельный — на [test.pypi.org](https://test.pypi.org/manage/account/token/) для тестовой площадки).
-Токен начинается с `pypi-`. Передавайте его через переменную окружения, а не аргументом командной
-строки — так он не попадёт в историю оболочки:
-
-```powershell
-# PowerShell
-$env:UV_PUBLISH_TOKEN = "pypi-AgEIcHl..."
-```
-
-```bash
-# bash
-export UV_PUBLISH_TOKEN="pypi-AgEIcHl..."
-```
-
-### 2. Сборка
-
-```bash
-uv build
-```
-
-Артефакты появятся в `dist/`: `gost_docx-<версия>-py3-none-any.whl` и `gost_docx-<версия>.tar.gz`.
-Если в `dist/` остались файлы прошлого выпуска, очистите каталог — `uv publish` загружает всё,
-что там лежит:
-
-```powershell
-Remove-Item -Recurse -Force dist   # PowerShell
-```
-
-```bash
-rm -rf dist                        # bash
-```
-
-### 3. Проверка на TestPyPI (рекомендуется)
-
-```bash
-uv publish --publish-url https://test.pypi.org/legacy/
-```
-
-Установка из TestPyPI — зависимости при этом берутся с основного PyPI:
-
-```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ gost-docx
-```
-
-### 4. Публикация
-
-```bash
-uv publish
-```
-
-Проверка установки из PyPI в чистом окружении:
-
-```bash
-uv run --with gost-docx --no-project -- python -c "from gost import WordBuilder; print(WordBuilder())"
-```
-
-### 5. Тег релиза
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+Сборка из исходников, запуск тестов и публикация релиза — в [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Лицензия
 

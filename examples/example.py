@@ -5,11 +5,7 @@
 import logging
 from pathlib import Path
 
-from gost import Pt, WordBuilder
-from gost.element_factory import ElementFactory
-from gost.elements.page_break import BreakType
-from gost.index.index_manager import IndexManager
-from gost.index.index_type import IndexType
+from gost import BreakType, ElementFactory, IndexManager, IndexType, Pt, WordBuilder
 
 OUTPUT = Path(__file__).parent / "example.docx"
 ASSETS = Path(__file__).parent
@@ -20,11 +16,11 @@ def main() -> None:
     factory = ElementFactory(IndexManager(character="А", index_type=IndexType.CONTINUOUS))
 
     # --- Заголовки ---
-    wb.add_element(factory.create_head(False, "Основная часть (уровень 0, Heading 1, по центру, UPPER, без номера)", 0))
-    wb.add_element(factory.create_head(True, "Заголовок первого уровня (уровень 1, Heading 2, с номером)", 1))
-    wb.add_element(factory.create_head(True, "Заголовок второго уровня (уровень 2, Heading 3, с номером)", 2))
-    wb.add_element(factory.create_head(True, "Заголовок третьего уровня (уровень 3, Heading 4, с номером)", 3))
-    wb.add_element(factory.create_head(True, "Заголовок четвертого уровня (уровень 4, Heading 5, с номером)", 4))
+    wb.add_element(factory.create_head("Основная часть (уровень 0, Heading 1, по центру, UPPER, без номера)", False, 0))
+    wb.add_element(factory.create_head("Заголовок первого уровня (уровень 1, Heading 2, с номером)", True, 1))
+    wb.add_element(factory.create_head("Заголовок второго уровня (уровень 2, Heading 3, с номером)", True, 2))
+    wb.add_element(factory.create_head("Заголовок третьего уровня (уровень 3, Heading 4, с номером)", True, 3))
+    wb.add_element(factory.create_head("Заголовок четвертого уровня (уровень 4, Heading 5, с номером)", True, 4))
 
     # --- Обычный текст ---
     wb.add_element(factory.create_text(
@@ -33,7 +29,6 @@ def main() -> None:
         "Длинный текст нужен, чтобы проверить выравнивание по ширине на нескольких строках — "
         "вот ещё немного слов для этого. "
     ))
-    wb.add_element(factory.create_text(""))
     # Инлайн-разметка: жирный/курсив/жирный курсив/подчёркнутый и неразрывный пробел (~).
     wb.add_element(factory.create_text(
         "Инлайн-разметка: **жирный**, *курсив*, _тоже курсив_, "
@@ -47,21 +42,27 @@ def main() -> None:
         "Пример подписи к рисунку с *курсивом*. Пример подписи к рисунку. "
         "Пример подписи к рисунку. Пример подписи к рисунку. Пример подписи к рисунку",
     )
-    wb.add_element(factory.create_text(f"На рисунке {image.index}."))
+    wb.add_element(factory.create_text(f"Тут демонстрируется пример ссылки на рисунок {image.index}. "
+                                       f"Также можно ссылаться на таблицы и формулы."))
 
-    # --- Рисунок ---
+    # А после ссылки добавляется рисунок
     wb.add_element(image)
 
     # --- Таблица по умолчанию: «№ п/п» и строка номеров столбцов ---
     # Числа форматируются до передачи — Table приводит значения через str().
-    wb.add_element(factory.create_table(
+
+    base_table = factory.create_table(
         {
             "Показатель А": [f"{v:.2f}" for v in (1.0, 2.5, 3.333)],
             "Показатель Б": [f"{v:.2f}" for v in (100.0, 200.0, 300.0)],
             "Текст": ["alpha", "beta", "gamma"],
         },
         title="Таблица по умолчанию: со столбцом «№ п/п» и строкой номеров столбцов",
-    ))
+    )
+
+    wb.add_element(factory.create_text(f"На таблице {base_table.index} можно увидеть пример таблицы по умолчанию: "
+                                       f"автоматически добавляется нумерация столбцов и строк, "
+                                       f"после нумерации строк идет двойная линия."))
 
     # --- Таблица без автонумерации; подпись с инлайн-разметкой ---
     wb.add_element(factory.create_table(
@@ -97,7 +98,7 @@ def main() -> None:
 
     # --- Формулы ---
     wb.add_element(factory.create_page_break())
-    wb.add_element(factory.create_head(False, "Формулы", 0))
+    wb.add_element(factory.create_head("Формулы", False, 0))
 
     # Нумерованная формула с расшифровкой обозначений: формула по центру,
     # номер у правого поля, ниже блок «где ...».
@@ -149,7 +150,7 @@ def main() -> None:
     wb.add_element(factory.create_text("Этот абзац начинается с новой страницы того же раздела."))
 
     # --- Настройка стилей: локально и глобально ---
-    wb.add_element(factory.create_head(False, "Настройка стилей", 0))
+    wb.add_element(factory.create_head("Настройка стилей", False, 0))
 
     # Локально: правим свойства стиля конкретной таблицы — на другие не влияет.
     local_table = factory.create_table(
