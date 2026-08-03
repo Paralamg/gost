@@ -70,12 +70,14 @@ class StyleSheet:
                 space_after=Pt(0),
             ),
             headings=[_gost_heading(*cfg) for cfg in _HEADING_CONFIGS],
+            # Подпись стоит над таблицей и не отбивается от неё.
             table_caption=ParagraphStyle(
                 font_size=Pt(14),
                 alignment=WD_ALIGN_PARAGRAPH.LEFT,
                 line_spacing=WD_LINE_SPACING.SINGLE,
                 first_line_indent=Cm(0),
-                space_after=Pt(6),
+                space_before=Pt(0),
+                space_after=Pt(0),
             ),
             table_text=ParagraphStyle(
                 font_size=Pt(12),
@@ -84,12 +86,15 @@ class StyleSheet:
                 space_before=Pt(0),
                 space_after=Pt(0),
             ),
+            # Подпись стоит под рисунком вплотную, а от следующего текста
+            # отбивается интервалом.
             image_caption=ParagraphStyle(
                 font_size=Pt(14),
                 alignment=WD_ALIGN_PARAGRAPH.CENTER,
                 line_spacing=WD_LINE_SPACING.SINGLE,
                 first_line_indent=Cm(0),
-                space_after=Pt(6),
+                space_before=Pt(0),
+                space_after=Pt(12),
             ),
             # Выше и ниже формулы ГОСТ требует свободную строку — это отбивки,
             # а не пустые абзацы. Выравнивание задаёт сам элемент: у нумерованной
