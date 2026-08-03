@@ -112,7 +112,7 @@ class Formula(NumberedElement):
             prefix = WHERE if position == 0 else ""
             ending = "." if position == len(items) - 1 else ";"
             paragraph = document.add_paragraph()
-            render_inline(paragraph, f"{prefix}{symbol} {DASH} {description}{ending}")
+            render_inline(paragraph, f"{prefix}\t{symbol} {DASH} {description}{ending}")
             apply_paragraph_style(paragraph, self.note_style)
 
 
