@@ -62,6 +62,11 @@ INLINE_STYLES: list[tuple[str, str, Callable[[Run], None]]] = [
 def _build(
         styles: list[tuple[str, str, Callable[[Run], None]]],
 ) -> tuple[re.Pattern[str], dict[str, Callable[[Run], None]]]:
+    """Собирает из таблицы стилей общий regex и разбор совпадений по стилям.
+
+    Один проход по тексту вместо прохода на каждый стиль: разбирать текст
+    последовательно нельзя, вложенные маркеры перехватывали бы друг друга.
+    """
     parts, apply_by_name = [], {}
     for i, (open_, close_, apply) in enumerate(styles):
         name = f"s{i}"

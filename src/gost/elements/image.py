@@ -1,3 +1,5 @@
+"""Элемент «рисунок с подписью»."""
+
 import logging
 from pathlib import Path
 
@@ -14,6 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 class Image(NumberedElement):
+    """Рисунок с подписью «Рисунок N – alt».
+
+    Рисунок растягивается по ширине текста (16,5 см) с сохранением пропорций и
+    ставится по центру, подпись — под ним. Файл читается при выводе документа,
+    а не при создании элемента: если к тому моменту его не окажется на месте,
+    вместо рисунка встанет заглушка, а в лог уйдёт предупреждение.
+
+    Args:
+        index: Номер рисунка.
+        path: Путь к файлу изображения.
+        alt: Подпись под рисунком. Понимает инлайн-разметку.
+        caption_style: Оформление подписи.
+    """
+
     def __init__(
             self,
             index: str,
@@ -21,9 +37,6 @@ class Image(NumberedElement):
             alt: str,
             caption_style: ParagraphStyle,
     ) -> None:
-        """
-        Создает изображение с подписью «Рисунок number — alt».
-        """
         super().__init__(index)
         self.alt = alt
         self.path = Path(path)

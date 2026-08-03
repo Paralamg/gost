@@ -65,7 +65,7 @@ from gost import ElementFactory, WordBuilder
 wb = WordBuilder()
 factory = ElementFactory()
 
-wb.add_element(factory.create_head("Введение", True, 1))
+wb.add_element(factory.create_head("Введение", False, 0))
 wb.add_element(factory.create_text("Обычный абзац с **жирным** и *курсивным* фрагментом."))
 wb.add_element(factory.create_table(
     {"Имя": ["Алиса", "Боб"], "Возраст": [25, 30]},
@@ -83,8 +83,8 @@ wb.save(Path("report.docx"))
 | --- | --- |
 | `create_text(text)` | Абзац. Поддерживает [инлайн-разметку](#инлайн-разметка). |
 | `create_head(text, use_numbers, level)` | Заголовок уровня 0–4. Уровень 0 — по центру, прописными, без номера. |
-| `create_image(path, alt)` | Рисунок с подписью «Рисунок N — alt». `alt` поддерживает [инлайн-разметку](#инлайн-разметка). |
-| `create_table(data, title, ...)` | Таблица с подписью «Таблица N — title». `title` поддерживает [инлайн-разметку](#инлайн-разметка). |
+| `create_image(path, alt)` | Рисунок с подписью «Рисунок N – alt». `alt` поддерживает [инлайн-разметку](#инлайн-разметка). |
+| `create_table(data, title, ...)` | Таблица с подписью «Таблица N – title». `title` поддерживает [инлайн-разметку](#инлайн-разметка). |
 | `create_formula(latex, ...)` | [Формула](#формулы) на LaTeX с номером у правого края. |
 | `create_page_break(break_type)` | Разрыв страницы или раздела. |
 

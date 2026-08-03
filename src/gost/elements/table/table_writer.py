@@ -57,6 +57,7 @@ def write_part(
     """Пишет непрерывный блок строк как отдельную таблицу.
 
     Args:
+        document: Куда дописывать таблицу.
         grid: Сетка целиком — нужна для ширины и раскладки столбцов.
         rows: Строки этой части, включая её шапку.
         text_style: Оформление текста ячеек.
@@ -99,6 +100,11 @@ def write_part(
 
 
 def _column_widths(document: Document, grid: Grid) -> list[Length]:
+    """Ширины столбцов: таблица занимает всю ширину текста.
+
+    Столбцы делят её поровну, кроме «№ п/п» — ему хватает узкой колонки, а
+    остаток отдаётся столбцам с данными.
+    """
     section = document.sections[0]
     total = section.page_width - section.left_margin - section.right_margin
 

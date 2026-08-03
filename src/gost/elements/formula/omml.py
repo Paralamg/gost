@@ -120,6 +120,7 @@ def _convert_sequence(elements: list) -> list:
 
 
 def _empty_nary_operand(nodes: list):
+    """m:e n-арного оператора, если он один и его операнд ещё пуст; иначе None."""
     if len(nodes) != 1 or nodes[0].tag != qn("m:nary"):
         return None
     operand = nodes[0].find(qn("m:e"))
@@ -127,6 +128,7 @@ def _empty_nary_operand(nodes: list):
 
 
 def _find_closing(elements: list, start: int, opening: str) -> int | None:
+    """Индекс парной закрывающей скобки с учётом вложенности; None — пары нет."""
     closing = BRACKET_PAIRS[opening]
     depth = 0
     for index in range(start + 1, len(elements)):
@@ -194,6 +196,7 @@ def _convert(element) -> list:
 # --- листья -----------------------------------------------------------------
 
 def _identifier(element) -> list:
+    """Переменная или имя функции."""
     text = _text_of(element)
     # Имя функции (sin, log, lim) — несколько букв подряд; курсив превратил бы его
     # в произведение переменных, поэтому прямой шрифт.
@@ -201,20 +204,24 @@ def _identifier(element) -> list:
 
 
 def _number(element) -> list:
+    """Число: прямое начертание у него и так по умолчанию."""
     return [_run(_text_of(element))]
 
 
 def _operator(element) -> list:
+    """Знак операции, не распознанный как скобка, акцент или n-арный оператор."""
     return [_run(_text_of(element))]
 
 
 def _literal_text(element) -> list:
+    """\\text{...} — обычный текст внутри формулы, без математического начертания."""
     return [_run(_text_of(element), literal=True)]
 
 
 # --- составные конструкции ---------------------------------------------------
 
 def _fraction(element) -> list:
+    """Дробь m:f — с чертой или, у \\binom, без неё."""
     parts = _args(element, 2)
     node = OxmlElement("m:f")
     if element.get("linethickness") == "0":
@@ -226,6 +233,7 @@ def _fraction(element) -> list:
 
 
 def _square_root(element) -> list:
+    """Квадратный корень: тот же m:rad, но с пустым и скрытым показателем."""
     node = OxmlElement("m:rad")
     node.append(_properties("m:radPr", _val("m:degHide", "on")))
     node.append(OxmlElement("m:deg"))
@@ -234,6 +242,7 @@ def _square_root(element) -> list:
 
 
 def _root(element) -> list:
+    """Корень с показателем: \\sqrt[3]{x}."""
     parts = _args(element, 2)
     node = OxmlElement("m:rad")
     node.append(_properties("m:radPr", _val("m:degHide", "off")))
@@ -243,6 +252,7 @@ def _root(element) -> list:
 
 
 def _subscript(element) -> list:
+    """Нижний индекс — либо нижний предел, если база это знак суммы."""
     parts = _args(element, 2)
     nary = _nary_from(element, sub=parts[1], sup=None)
     if nary is not None:
@@ -251,6 +261,7 @@ def _subscript(element) -> list:
 
 
 def _superscript(element) -> list:
+    """Верхний индекс — либо верхний предел, если база это знак суммы."""
     parts = _args(element, 2)
     nary = _nary_from(element, sub=None, sup=parts[1])
     if nary is not None:
@@ -259,6 +270,7 @@ def _superscript(element) -> list:
 
 
 def _sub_superscript(element) -> list:
+    """Оба индекса сразу — либо оба предела у знака суммы или интеграла."""
     parts = _args(element, 3)
     nary = _nary_from(element, sub=parts[1], sup=parts[2])
     if nary is not None:
@@ -267,16 +279,19 @@ def _sub_superscript(element) -> list:
 
 
 def _under(element) -> list:
+    """Знак под базой: предел \\lim, черта снизу, нижняя скобка-обхват."""
     parts = _args(element, 2)
     return _limit(element, base=parts[0], mark_index=1, above=False)
 
 
 def _over(element) -> list:
+    """Знак над базой: акцент \\vec и \\hat, черта \\overline, верхняя скобка."""
     parts = _args(element, 2)
     return _limit(element, base=parts[0], mark_index=1, above=True)
 
 
 def _under_over(element) -> list:
+    """Знаки и снизу, и сверху: пределы n-арного оператора либо два m:lim."""
     parts = _args(element, 3)
     nary = _nary_from(element, sub=parts[1], sup=parts[2])
     if nary is not None:
@@ -331,6 +346,7 @@ def _limit(element, base: list, mark_index: int, above: bool) -> list:
 
 
 def _matrix(element) -> list:
+    """Матрица m:m. Скобки вокруг неё сворачивает _convert_sequence — они соседи."""
     rows = [child for child in element if etree.QName(child).localname == "mtr"]
     node = OxmlElement("m:m")
     alignment = _column_alignment(rows)
@@ -345,6 +361,7 @@ def _matrix(element) -> list:
 
 
 def _column_alignment(rows: list) -> str | None:
+    """Выравнивание столбцов матрицы или None, если оно и так по умолчанию."""
     for row in rows:
         for cell in row:
             align = cell.get("columnalign")
@@ -355,10 +372,12 @@ def _column_alignment(rows: list) -> str | None:
 
 
 def _column_count(rows: list) -> int:
+    """Число столбцов матрицы — по самой длинной строке."""
     return max((len(list(row)) for row in rows), default=1)
 
 
 def _matrix_properties(alignment: str, columns: int):
+    """m:mPr: одинаковое выравнивание для всех столбцов матрицы."""
     column = OxmlElement("m:mc")
     column.append(_properties(
         "m:mcPr", _val("m:count", str(columns)), _val("m:mcJc", alignment)
@@ -400,6 +419,7 @@ def _nary_from(element, sub: list | None, sup: list | None) -> list | None:
 
 
 def _composite(tag: str, *parts: tuple[str, list]):
+    """Конструкция OMML из именованных частей: («m:e», база), («m:sup», степень)."""
     node = OxmlElement(tag)
     for name, children in parts:
         node.append(_arg(name, children))
@@ -407,6 +427,7 @@ def _composite(tag: str, *parts: tuple[str, list]):
 
 
 def _arg(tag: str, children: list):
+    """Одна часть конструкции: тег с вложенными в него узлами."""
     node = OxmlElement(tag)
     for child in children:
         node.append(child)
@@ -420,6 +441,11 @@ def _args(element, count: int) -> list[list]:
 
 
 def _run(text: str, *, upright: bool = False, literal: bool = False):
+    """Текстовый фрагмент формулы.
+
+    По умолчанию начертание математическое — переменные выходят курсивом.
+    ``upright`` даёт прямой шрифт имени функции, ``literal`` — обычный текст.
+    """
     node = OxmlElement("m:r")
     if literal:
         # \text{...} — обычный текст абзаца, без математического начертания.
@@ -435,6 +461,7 @@ def _run(text: str, *, upright: bool = False, literal: bool = False):
 
 
 def _properties(tag: str, *children):
+    """Блок настроек конструкции: m:fPr, m:radPr, m:naryPr и подобные."""
     node = OxmlElement(tag)
     for child in children:
         node.append(child)
@@ -442,12 +469,17 @@ def _properties(tag: str, *children):
 
 
 def _val(tag: str, value: str):
+    """Одна настройка: тег со значением в атрибуте m:val."""
     node = OxmlElement(tag)
     node.set(qn("m:val"), value)
     return node
 
 
 def _delimiter(opening: str, closing: str, children: list):
+    """Содержимое в скобках m:d — они растягиваются по его высоте.
+
+    Пустая *closing* оставляет группу без закрывающей скобки, как \\begin{cases}.
+    """
     node = OxmlElement("m:d")
     node.append(_properties(
         "m:dPr", _val("m:begChr", opening), _val("m:endChr", closing)
@@ -465,18 +497,23 @@ def _operator_char(element) -> str:
 
 
 def _is_fence(element) -> bool:
+    """Скобка ли это, растягиваемая по содержимому: \\left, \\begin{cases}."""
     return element.get("fence") == "true" or element.get("stretchy") == "true"
 
 
 def _text_of(element) -> str:
+    """Собственный текст узла без окружающих пробелов."""
     return (element.text or "").strip()
 
 
 def _text_fallback(element) -> list:
+    """Запасной перевод неподдержанного тега: весь его текст одним фрагментом."""
     text = "".join(element.itertext()).strip()
     return [_run(text)] if text else []
 
 
+# Тег MathML -> функция, переводящая его в OMML. Всё, чего здесь нет,
+# выводится текстом с предупреждением в лог.
 _HANDLERS = {
     "mi": _identifier,
     "mn": _number,

@@ -1,3 +1,23 @@
+"""Генерация документов Word (.docx), оформленных по ГОСТ 7.32-2017.
+
+Документ собирается из элементов: заголовков, абзацев, таблиц, рисунков, формул
+и разрывов. Элементы создаёт :class:`ElementFactory` — она же ведёт счётчики
+номеров и раздаёт элементам оформление, — а :class:`WordBuilder` собирает из них
+файл::
+
+    from pathlib import Path
+    from gost import ElementFactory, WordBuilder
+
+    wb = WordBuilder()
+    factory = ElementFactory()
+    wb.add_element(factory.create_head("Введение", False, 0))
+    wb.add_element(factory.create_text("Обычный абзац с **жирным** фрагментом."))
+    wb.save(Path("report.docx"))
+
+Нумерация и оформление — забота библиотеки: номера рисунков, таблиц и формул
+проставляются сами, а стили по умолчанию берутся из :meth:`StyleSheet.gost`.
+"""
+
 import logging
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING

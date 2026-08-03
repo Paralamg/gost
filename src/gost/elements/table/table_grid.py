@@ -9,7 +9,16 @@ ROW_NUMBER_HEADER = "№ п/п"
 
 @dataclass(frozen=True)
 class Grid:
-    """Ячейки таблицы, приведённые к строкам и разложенные по ролям."""
+    """Ячейки таблицы, приведённые к строкам и разложенные по ролям.
+
+    Attributes:
+        header: Строка с именами столбцов или None, если её не выводят.
+        numbers: Строка с номерами столбцов или None, если её не выводят.
+        body: Строки данных — только их и режут точки разрыва.
+        has_row_numbers: Первый столбец — «№ п/п». Ему отводится своя, узкая
+            ширина, поэтому признак нужен и после того, как номера уже
+            разложены по строкам.
+    """
 
     header: list[str] | None
     numbers: list[str] | None
@@ -18,6 +27,7 @@ class Grid:
 
     @property
     def width(self) -> int:
+        """Число столбцов, включая «№ п/п». 0 — если строк нет вовсе."""
         for row in (self.header, self.numbers, *self.body):
             if row is not None:
                 return len(row)
@@ -78,4 +88,5 @@ def build_grid(
 
 
 def _to_text(value: Any) -> str:
+    """Значение ячейки как строка. None — пустая ячейка, а не «None»."""
     return "" if value is None else str(value)

@@ -69,7 +69,11 @@ class WordMirror:
     """
 
     def __init__(self, base: Path) -> None:
-        """Args: base: Пустой документ с нужными стилями — с него начинается зеркало."""
+        """Args:
+            base: Пустой документ с нужными стилями — с него начинается зеркало.
+                Открывается при входе в контекст и не изменяется на диске:
+                документ закрывается без сохранения.
+        """
         self.__base = base
         self.__word = None
         self.__document = None
@@ -115,6 +119,7 @@ class WordMirror:
         self.__close()
 
     def __close(self) -> None:
+        """Закрывает документ без сохранения и завершает свой процесс Word."""
         if self.__document is not None:
             self.__document.Close(False)
             self.__document = None
@@ -146,6 +151,7 @@ class WordMirror:
                 self.__trailing += 1
 
     def undo(self) -> None:
+        """Отменяет последнюю вставку — той же командой отмены, что и сам Word."""
         # Собственный Undo Word отменяет вставку точно. Считать позиции в Range
         # и удалять диапазон — нельзя: Word бережёт последний абзац документа и
         # оставляет его, зеркало разъезжается с документом, и вёрстка едет
@@ -155,10 +161,22 @@ class WordMirror:
         self.__trailing = self.__trailing_before_append
 
     def first_row_on_later_page(self, after: int) -> int | None:
+        """Первая строка последней таблицы, ушедшая на следующую страницу.
+
+        Меряется всегда последняя таблица зеркала: подбор идёт сверху вниз,
+        поэтому она и есть та, которую сейчас подбирают.
+
+        Args:
+            after: Искать начиная с этой строки (0-based).
+
+        Returns:
+            Номер строки (0-based) или None, если таблица уместилась на страницу.
+        """
         table = self.__live.Tables(self.__live.Tables.Count)  # последняя — та, что мерим
         queries = 0
 
         def page_of(row: int) -> int:
+            """На какой странице Word сверстал строку *row* (строки с нуля)."""
             nonlocal queries
             queries += 1
             return table.Rows(row + 1).Range.Information(WD_ACTIVE_END_PAGE_NUMBER)
@@ -174,6 +192,7 @@ class WordMirror:
 
     @property
     def __live(self):
+        """Открытый документ Word. Вне контекстного менеджера его нет."""
         if self.__document is None:
             raise RuntimeError("WordMirror используется вне контекстного менеджера")
         return self.__document

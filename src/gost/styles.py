@@ -1,3 +1,16 @@
+"""Оформление документа: стили абзацев и их применение.
+
+Работают два механизма. Именованные стили Word (Normal, Table Text, Heading 1..5)
+настраиваются один раз на документ в :func:`apply_gost_styles` — от них наследует
+всё содержимое. Поверх них элементы кладут прямое форматирование из своего
+:class:`ParagraphStyle`, поэтому правка стиля одного элемента не задевает
+остальные.
+
+Исключение — текст ячеек таблицы: прямое форматирование каждой ячейки съедает
+основное время сборки, поэтому под него регистрируется именованный стиль
+(:func:`resolve_table_text_style`).
+"""
+
 import hashlib
 from dataclasses import dataclass, field, replace
 
@@ -36,6 +49,7 @@ class ParagraphStyle:
     space_after: Length | None = None
 
     def copy(self) -> "ParagraphStyle":
+        """Независимая копия стиля — её правки не видны исходному."""
         # Поля — неизменяемые value-типы (Length/RGBColor/enum), shallow-копии
         # достаточно, чтобы правки элемента не текли в общий StyleSheet.
         return replace(self)
@@ -117,6 +131,7 @@ class StyleSheet:
         )
 
     def copy(self) -> "StyleSheet":
+        """Независимая копия листа вместе со всеми стилями внутри него."""
         return StyleSheet(
             normal=self.normal.copy(),
             headings=[h.copy() for h in self.headings],
@@ -148,6 +163,7 @@ def _gost_heading(
         all_caps: bool,
         spacing: Length,
 ) -> ParagraphStyle:
+    """Стиль заголовка одного уровня по кортежу настроек из _HEADING_CONFIGS."""
     return ParagraphStyle(
         font_size=Pt(14),
         bold=bold,
@@ -192,11 +208,12 @@ def resolve_table_text_style(document: Document, style: ParagraphStyle) -> str:
 
 
 def apply_gost_styles(doc: Document) -> None:
-    """Configure GOST 7.32-2001 base styles, margins and language on *doc* in-place.
+    """Настраивает *doc* по ГОСТ 7.32-2017: поля страницы, язык и базовые стили.
 
-    Настраивает базовые именованные стили (Normal, Table Text, Heading 1..5) —
-    к ним элементы применяют своё оформление поверх. Значения берутся из
-    StyleSheet.gost(), чтобы не дублировать дефолты.
+    Базовые именованные стили (Normal, Table Text, Heading 1..5) — то, от чего
+    наследует всё содержимое документа; элементы применяют своё оформление
+    поверх. Значения берутся из :meth:`StyleSheet.gost`, чтобы не дублировать
+    дефолты. Документ меняется на месте.
     """
     sheet = StyleSheet.gost()
     _apply_section(doc)
@@ -224,7 +241,7 @@ def _apply_language(doc: Document) -> None:
 
 
 def _apply_section(doc: Document) -> None:
-    # Page margins per ГОСТ 7.32-2001: left ≥ 30mm, right ≥ 10mm, top ≥ 20mm, bottom ≥ 20mm
+    """Поля страницы по ГОСТ 7.32-2017: левое 30 мм, правое 15 мм, верхнее и нижнее 20 мм."""
     section = doc.sections[0]
     section.left_margin = Cm(3.0)
     section.right_margin = Cm(1.5)
@@ -233,6 +250,12 @@ def _apply_section(doc: Document) -> None:
 
 
 def _apply_heading_styles(doc: Document, headings: list[ParagraphStyle]) -> None:
+    """Перенастраивает стили «Heading 1..5» шаблона Word под ГОСТ.
+
+    Кроме шрифта и абзаца из *headings* с них снимается наследие шаблона: ссылки
+    на шрифты темы, которые перебивают заданное имя шрифта, и линия под
+    заголовком — в ParagraphStyle она не выражается.
+    """
     for level, style in enumerate(headings):
         s = doc.styles[f"Heading {level + 1}"]
         _remove_theme_font_overrides(s)
@@ -241,6 +264,7 @@ def _apply_heading_styles(doc: Document, headings: list[ParagraphStyle]) -> None
 
 
 def _create_paragraph_style(document: Document, name: str, style: ParagraphStyle):
+    """Регистрирует в документе новый именованный стиль абзаца."""
     s = document.styles.add_style(name, WD_STYLE_TYPE.PARAGRAPH)
     _configure_style(s, style)
     return s
@@ -253,6 +277,7 @@ def _configure_style(style_obj, style: ParagraphStyle) -> None:
 
 
 def _apply_font(font, style: ParagraphStyle) -> None:
+    """Переносит шрифтовую часть стиля. Поля со значением None не трогаются."""
     font.name = style.font_name
     font.size = style.font_size
     if style.bold is not None:
@@ -266,6 +291,7 @@ def _apply_font(font, style: ParagraphStyle) -> None:
 
 
 def _apply_parfmt(parfmt, style: ParagraphStyle) -> None:
+    """Переносит абзацную часть стиля. Поля со значением None не трогаются."""
     if style.alignment is not None:
         parfmt.alignment = style.alignment
     if style.line_spacing is not None:
@@ -299,6 +325,11 @@ def _style_key(style: ParagraphStyle) -> tuple:
 
 
 def _table_text_style_name(style: ParagraphStyle) -> str:
+    """Имя именованного стиля под конфигурацию текста ячеек.
+
+    Детерминировано по содержимому: одинаковые конфигурации получают одно имя и
+    переиспользуют один стиль вместо того, чтобы плодить их на каждую таблицу.
+    """
     key = _style_key(style)
     if key == _GOST_TABLE_TEXT_KEY:
         return CELL_STYLE  # совпадает с базовым «Table Text»
@@ -307,6 +338,7 @@ def _table_text_style_name(style: ParagraphStyle) -> str:
 
 
 def _remove_theme_font_overrides(style) -> None:
+    """Снимает ссылки на шрифты темы: они сильнее заданного имени шрифта."""
     rPr = style.element.get_or_add_rPr()
     rFonts = rPr.find(qn("w:rFonts"))
     if rFonts is not None:
@@ -315,6 +347,7 @@ def _remove_theme_font_overrides(style) -> None:
 
 
 def _remove_bottom_border(style) -> None:
+    """Убирает линию под заголовком, которую рисует шаблон Word."""
     pPr = style.element.get_or_add_pPr()
     for pBdr in pPr.findall(qn("w:pBdr")):
         pPr.remove(pBdr)

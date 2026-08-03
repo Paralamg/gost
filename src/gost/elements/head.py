@@ -1,3 +1,5 @@
+"""Элемент «заголовок раздела»."""
+
 from docx.document import Document
 
 from gost.elements.element import NumberedElement
@@ -8,6 +10,11 @@ class Head(NumberedElement):
     """Заголовок документа.
 
     Args:
+        index: Номер раздела («1.1»). Пустая строка — у структурного элемента
+            номера нет.
+        text: Текст заголовка.
+        use_number: Выводить ли номер перед текстом. Номер всё равно занят
+            фабрикой, поэтому нумерация следующих разделов не сбивается.
         level: Логический уровень заголовка. 0 — ненумерованный структурный
             элемент («Введение», «Основная часть»), 1..4 — нумерованные
             разделы и подразделы («1», «1.1», «1.1.1», «1.1.1.1»).
@@ -37,6 +44,7 @@ class Head(NumberedElement):
         apply_paragraph_style(heading, self.style)
 
     def __prepare_render_text(self) -> str:
+        """Текст заголовка вместе с номером, если он есть и нужен."""
         if self.use_number and self.index:
             return f"{self.index} {self.text}"
         return f"{self.text}"
