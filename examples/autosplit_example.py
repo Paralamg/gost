@@ -16,8 +16,7 @@
 import logging
 from pathlib import Path
 
-from gost import WordBuilder
-from gost.element_factory import ElementFactory
+from gost import ElementFactory, WordBuilder
 
 OUTPUT = Path(__file__).parent / "autosplit_example.docx"
 ROWS = 110

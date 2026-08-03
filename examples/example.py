@@ -5,11 +5,7 @@
 import logging
 from pathlib import Path
 
-from gost import Pt, WordBuilder
-from gost.element_factory import ElementFactory
-from gost.elements.page_break import BreakType
-from gost.index.index_manager import IndexManager
-from gost.index.index_type import IndexType
+from gost import BreakType, ElementFactory, IndexManager, IndexType, Pt, WordBuilder
 
 OUTPUT = Path(__file__).parent / "example.docx"
 ASSETS = Path(__file__).parent
